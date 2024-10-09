@@ -151,9 +151,9 @@ jobs:
       - name: Run Tests to Generate Coverage Data
         run: cargo test --workspace --features ${{ matrix.features }}
       - name: Generate Human-Readable Coverage Report
-        run: cargo llvm-cov report --workspace --text --fail-under-lines 90
+        run: cargo llvm-cov report --text --fail-under-lines 90
       - name: Generate LCOV Report
-        run: cargo llvm-cov report --workspace --lcov --output-path lcov.info
+        run: cargo llvm-cov report --lcov --output-path lcov.info
         
   # Run cargo fmt --all -- --config imports_granularity=Crate,group_imports=One --check
   format:

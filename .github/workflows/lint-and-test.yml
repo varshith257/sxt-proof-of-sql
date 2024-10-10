@@ -141,18 +141,31 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        features: [ "test", "blitzar", "arrow", "rayon", "perf", "std", "default" ]
+        features: [ "all-features", "no-default-features --features=rayon", "no-default-features --features=blitzar", "no-default-features" ]
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
       - name: Install Dependencies
         run: sudo apt-get update && sudo apt-get install -y clang lld
       - uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Run Tests to Generate Coverage Data
-        run: cargo llvm-cov test --workspace --features ${{ matrix.features }}
+      - name: Run Tests to Generate Coverage Data for ${{ matrix.features }}
+        run: cargo llvm-cov test --workspace --${{ matrix.features }}
+      - name: Merge Coverage Data
+        run: cargo llvm-cov report --summary-only --merge  
       - name: Generate LCOV Report
-        run: cargo llvm-cov report --lcov --output-path lcov.info --fail-under-lines 90
-
+        run: cargo llvm-cov report --lcov --output-path lcov.info --fail-under-lines 95
+      # Future CodeCov Integration
+      # To integrate with CodeCov in the future,, follow these steps: 
+      # 1. Add the CodeCov token to the repository secrets.
+      # 2. Use the CodeCov Action to upload the coverage report. For more detailed info refer to [CodeCov Documentation](https://docs.codecov.com/docs).
+      #
+      # - name: Upload Coverage to Codecov
+      # uses: codecov/codecov-action@v2
+      # with:
+      #   token: ${{ secrets.CODECOV_TOKEN }}
+      #   files: lcov.info
+      #   fail_ci_if_error: true
+        
   # Run cargo fmt --all -- --config imports_granularity=Crate,group_imports=One --check
   format:
     name: Format

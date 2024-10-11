@@ -157,7 +157,7 @@ jobs:
       #   run: cargo llvm-cov --no-report --no-default-features --features="std"
       # Display coverage summary in CI logs
       - name: Display Coverage Summary in CI (Human-Readable)
-        run: cargo llvm-cov report --text --fail-under-lines 95
+        run: cargo llvm-cov report --summary-only --fail-under-lines 95
       # - name: Generate Final LCOV Report (Merged Coverage)
       #   run: cargo llvm-cov report --lcov --output-path lcov.info --fail-under-lines 95
 

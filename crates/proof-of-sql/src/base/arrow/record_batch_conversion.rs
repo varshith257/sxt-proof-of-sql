@@ -99,7 +99,7 @@ impl<C: Commitment> TableCommitment<C> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "arrow", feature = "blitzar"))]
 mod tests {
     use super::*;
     use crate::{base::scalar::Curve25519Scalar, record_batch};

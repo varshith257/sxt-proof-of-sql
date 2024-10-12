@@ -1,6 +1,13 @@
-use crate::base::scalar::Scalar;
-use crate::sql::proof::QueryData;
+use crate::{base::scalar::Scalar, sql::proof::QueryData};
 use arrow::{error::ArrowError, record_batch::RecordBatch};
+
+impl<S: Scalar> QueryData<S> {
+    #[cfg(all(test, feature = "arrow"))]
+    #[must_use]
+    pub fn into_record_batch(self) -> RecordBatch {
+        self.try_into().unwrap()
+    }
+}
 
 #[cfg(feature = "arrow")]
 impl<S: Scalar> TryFrom<QueryData<S>> for RecordBatch {

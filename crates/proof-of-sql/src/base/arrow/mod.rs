@@ -38,3 +38,9 @@ pub mod arrow_query_result;
 
 #[cfg(all(test, feature = "arrow"))]
 mod final_round_builder_arrow_tests;
+
+#[cfg(all(test, feature = "arrow"))]
+mod provable_query_result_test;
+
+#[cfg(all(test, feature = "arrow", feature = "test"))]
+mod test_accessor_utility;

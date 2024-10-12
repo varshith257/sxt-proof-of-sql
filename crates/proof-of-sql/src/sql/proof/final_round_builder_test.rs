@@ -7,7 +7,6 @@ use crate::{
     },
     sql::proof::SumcheckSubpolynomialType,
 };
-
 use curve25519_dalek::RistrettoPoint;
 use num_traits::{One, Zero};
 

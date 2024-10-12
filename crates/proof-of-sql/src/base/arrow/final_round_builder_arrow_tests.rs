@@ -1,6 +1,10 @@
-use crate::base::database::{Column, ColumnField, ColumnType};
-use crate::base::scalar::Curve25519Scalar;
-use crate::sql::proof::ProvableQueryResult;
+use crate::{
+    base::{
+        database::{Column, ColumnField, ColumnType},
+        scalar::Curve25519Scalar,
+    },
+    sql::proof::ProvableQueryResult,
+};
 use alloc::sync::Arc;
 use arrow::{
     array::Int64Array,

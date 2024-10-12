@@ -1,12 +1,12 @@
+use crate::base::database::{Column, ColumnField, ColumnType};
+use crate::base::scalar::Curve25519Scalar;
+use crate::sql::proof::ProvableQueryResult;
+use alloc::sync::Arc;
 use arrow::{
     array::Int64Array,
     datatypes::{Field, Schema},
     record_batch::RecordBatch,
 };
-use crate::base::database::{Column, ColumnField, ColumnType};
-use crate::base::scalar::Curve25519Scalar;
-use crate::sql::proof::ProvableQueryResult;
-use alloc::sync::Arc;
 
 #[cfg(feature = "arrow")]
 #[test]

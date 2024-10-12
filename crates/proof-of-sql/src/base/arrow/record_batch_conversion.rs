@@ -1,13 +1,15 @@
-use super::arrow_array_to_column_conversion::ArrayRefExt;
-use super::record_batch_errors::{
-    AppendRecordBatchTableCommitmentError, RecordBatchToColumnsError,
+use super::{
+    arrow_array_to_column_conversion::ArrayRefExt,
+    record_batch_errors::{AppendRecordBatchTableCommitmentError, RecordBatchToColumnsError},
 };
-use crate::base::commitment::{
-    AppendColumnCommitmentsError, AppendTableCommitmentError, Commitment, TableCommitment,
-    TableCommitmentFromColumnsError,
+use crate::base::{
+    commitment::{
+        AppendColumnCommitmentsError, AppendTableCommitmentError, Commitment, TableCommitment,
+        TableCommitmentFromColumnsError,
+    },
+    database::Column,
+    scalar::Scalar,
 };
-use crate::base::database::Column;
-use crate::base::scalar::Scalar;
 use arrow::record_batch::RecordBatch;
 use bumpalo::Bump;
 use proof_of_sql_parser::Identifier;
@@ -100,8 +102,7 @@ impl<C: Commitment> TableCommitment<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::base::scalar::Curve25519Scalar;
-    use crate::record_batch;
+    use crate::{base::scalar::Curve25519Scalar, record_batch};
     use curve25519_dalek::RistrettoPoint;
 
     #[test]

@@ -1,7 +1,6 @@
-use crate::base::database::{OwnedColumn, OwnedTable};
 use crate::{
     base::{
-        database::{owned_table_utility::*, OwnedArrowConversionError},
+        database::{owned_table_utility::*, OwnedArrowConversionError, OwnedColumn, OwnedTable},
         map::IndexMap,
         scalar::Curve25519Scalar,
     },

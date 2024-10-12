@@ -19,8 +19,6 @@ mod literal_value;
 pub use literal_value::LiteralValue;
 
 mod table_ref;
-pub use table_ref::TableRef;
-
 #[cfg(feature = "arrow")]
 pub use crate::base::arrow::{
     arrow_array_to_column_conversion::{ArrayRefExt, ArrowArrayToColumnConversionError},
@@ -28,6 +26,7 @@ pub use crate::base::arrow::{
     record_batch_utility::ToArrow,
     scalar_and_i256_conversions,
 };
+pub use table_ref::TableRef;
 
 #[cfg(all(test, feature = "arrow", feature = "test"))]
 mod test_accessor_utility;

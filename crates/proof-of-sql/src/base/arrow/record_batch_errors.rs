@@ -3,6 +3,7 @@ use crate::base::commitment::ColumnCommitmentsMismatch;
 use proof_of_sql_parser::ParseError;
 use snafu::Snafu;
 
+#[cfg(feature = "arrow")]
 #[derive(Debug, Snafu)]
 pub enum RecordBatchToColumnsError {
     /// Error converting from arrow array
@@ -19,6 +20,7 @@ pub enum RecordBatchToColumnsError {
     },
 }
 
+#[cfg(feature = "arrow")]
 #[derive(Debug, Snafu)]
 pub enum AppendRecordBatchTableCommitmentError {
     #[snafu(transparent)]

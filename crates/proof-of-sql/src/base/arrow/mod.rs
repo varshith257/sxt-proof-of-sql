@@ -5,8 +5,8 @@
 pub mod arrow_array_to_column_conversion;
 #[cfg(feature = "arrow")]
 pub mod owned_and_arrow_conversions;
-#[cfg(test, feature = "arrow")]
-pub mod owned_and_arrow_conversions_test;
+#[cfg(all(test, feature = "arrow"))]
+mod owned_and_arrow_conversions_test;
 #[cfg(feature = "arrow")]
 pub mod record_batch_conversion;
 #[cfg(feature = "arrow")]

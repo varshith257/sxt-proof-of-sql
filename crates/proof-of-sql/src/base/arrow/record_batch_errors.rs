@@ -1,5 +1,5 @@
-use crate::base::commitment::ColumnCommitmentsMismatch;
 use super::arrow_array_to_column_conversion::ArrowArrayToColumnConversionError;
+use crate::base::commitment::ColumnCommitmentsMismatch;
 use proof_of_sql_parser::ParseError;
 use snafu::Snafu;
 
@@ -22,11 +22,7 @@ pub enum RecordBatchToColumnsError {
 #[derive(Debug, Snafu)]
 pub enum AppendRecordBatchTableCommitmentError {
     #[snafu(transparent)]
-    ColumnCommitmentsMismatch {
-        source: ColumnCommitmentsMismatch,
-    },
+    ColumnCommitmentsMismatch { source: ColumnCommitmentsMismatch },
     #[snafu(transparent)]
-    ArrowBatchToColumnError {
-        source: RecordBatchToColumnsError,
-    },
+    ArrowBatchToColumnError { source: RecordBatchToColumnsError },
 }

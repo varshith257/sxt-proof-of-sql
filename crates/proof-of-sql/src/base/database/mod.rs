@@ -24,8 +24,8 @@ pub use table_ref::TableRef;
 #[cfg(feature = "arrow")]
 pub use crate::base::arrow::{
     arrow_array_to_column_conversion::{ArrayRefExt, ArrowArrayToColumnConversionError},
-    record_batch_utility::ToArrow,
     owned_and_arrow_conversions::OwnedArrowConversionError,
+    record_batch_utility::ToArrow,
     scalar_and_i256_conversions,
 };
 
@@ -57,7 +57,6 @@ mod expression_evaluation_error;
 #[cfg(test)]
 mod expression_evaluation_test;
 pub use expression_evaluation_error::{ExpressionEvaluationError, ExpressionEvaluationResult};
-
 
 #[cfg(any(test, feature = "test"))]
 mod test_accessor;

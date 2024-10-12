@@ -1,5 +1,7 @@
-use crate::base::database::{ColumnField, ColumnType};
-use crate::base::math::decimal::Precision;
+use crate::base::{
+    database::{ColumnField, ColumnType},
+    math::decimal::Precision,
+};
 use alloc::sync::Arc;
 use arrow::datatypes::{DataType, Field, TimeUnit as ArrowTimeUnit};
 use proof_of_sql_parser::posql_time::{PoSQLTimeUnit, PoSQLTimeZone};

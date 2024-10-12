@@ -1,9 +1,9 @@
 use arrow::record_batch::RecordBatch;
 use bumpalo::Bump;
 use indexmap::IndexMap;
+use proof_of_sql::base::arrow::arrow_array_to_column_conversion::ArrayRefExt;
 use proof_of_sql::base::{
-    database::{
-        ArrayRefExt, Column, ColumnRef, ColumnType, DataAccessor, MetadataAccessor, SchemaAccessor,
+    database::{Column, ColumnRef, ColumnType, DataAccessor, MetadataAccessor, SchemaAccessor,
         TableRef,
     },
     scalar::Scalar,

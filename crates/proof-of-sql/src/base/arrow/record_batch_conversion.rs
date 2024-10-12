@@ -14,6 +14,10 @@ use arrow::record_batch::RecordBatch;
 use bumpalo::Bump;
 use proof_of_sql_parser::Identifier;
 
+/// This function will return an error if:
+/// - The field name cannot be parsed into an [`Identifier`].
+/// - The conversion of an Arrow array to a [`Column`] fails.
+#[cfg(feature = "arrow")]
 pub fn batch_to_columns<'a, S: Scalar + 'a>(
     batch: &'a RecordBatch,
     alloc: &'a Bump,

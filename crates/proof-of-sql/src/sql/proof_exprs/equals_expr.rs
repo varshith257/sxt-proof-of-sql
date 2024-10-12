@@ -8,7 +8,7 @@ use crate::{
         scalar::Scalar,
         slice_ops,
     },
-    sql::proof::{CountBuilder, FinalRoundBuilder, SumcheckSubpolynomialType, VerificationBuilder},
+    sql::proof::{CountBuilder, ProofBuilder, SumcheckSubpolynomialType, VerificationBuilder},
 };
 use alloc::{boxed::Box, vec};
 use bumpalo::Bump;
@@ -59,7 +59,7 @@ impl<C: Commitment> ProofExpr<C> for EqualsExpr<C> {
     #[tracing::instrument(name = "EqualsExpr::prover_evaluate", level = "debug", skip_all)]
     fn prover_evaluate<'a>(
         &self,
-        builder: &mut FinalRoundBuilder<'a, C::Scalar>,
+        builder: &mut ProofBuilder<'a, C::Scalar>,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<C::Scalar>,
     ) -> Column<'a, C::Scalar> {
@@ -105,7 +105,7 @@ pub fn result_evaluate_equals_zero<'a, S: Scalar>(
 }
 
 pub fn prover_evaluate_equals_zero<'a, S: Scalar>(
-    builder: &mut FinalRoundBuilder<'a, S>,
+    builder: &mut ProofBuilder<'a, S>,
     alloc: &'a Bump,
     lhs: &'a [S],
 ) -> &'a [bool] {

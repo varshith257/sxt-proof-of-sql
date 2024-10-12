@@ -16,7 +16,7 @@ use crate::{
     },
     sql::{
         proof::{
-            CountBuilder, FinalRoundBuilder, FirstRoundBuilder, ProofPlan, ProverEvaluate,
+            CountBuilder, ProofBuilder, ProofPlan, ProverEvaluate, ResultBuilder,
             SumcheckSubpolynomialType, VerificationBuilder,
         },
         proof_exprs::{AliasedDynProofExpr, ColumnExpr, DynProofExpr, ProofExpr, TableExpr},
@@ -208,10 +208,11 @@ impl<C: Commitment> ProverEvaluate<C::Scalar> for GroupByExec<C> {
     #[tracing::instrument(name = "GroupByExec::result_evaluate", level = "debug", skip_all)]
     fn result_evaluate<'a>(
         &self,
-        input_length: usize,
+        builder: &mut ResultBuilder,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<C::Scalar>,
     ) -> Vec<Column<'a, C::Scalar>> {
+        let input_length = accessor.get_length(self.table.table_ref);
         // 1. selection
         let selection_column: Column<'a, C::Scalar> =
             self.where_clause
@@ -245,6 +246,8 @@ impl<C: Commitment> ProverEvaluate<C::Scalar> for GroupByExec<C> {
         } = aggregate_columns(alloc, &group_by_columns, &sum_columns, &[], &[], selection)
             .expect("columns should be aggregatable");
         let sum_result_columns_iter = sum_result_columns.iter().map(|col| Column::Scalar(col));
+        builder.set_result_table_length(count_column.len());
+        builder.request_post_result_challenges(2);
         group_by_result_columns
             .into_iter()
             .chain(sum_result_columns_iter)
@@ -252,15 +255,11 @@ impl<C: Commitment> ProverEvaluate<C::Scalar> for GroupByExec<C> {
             .collect::<Vec<_>>()
     }
 
-    fn first_round_evaluate(&self, builder: &mut FirstRoundBuilder) {
-        builder.request_post_result_challenges(2);
-    }
-
-    #[tracing::instrument(name = "GroupByExec::final_round_evaluate", level = "debug", skip_all)]
+    #[tracing::instrument(name = "GroupByExec::prover_evaluate", level = "debug", skip_all)]
     #[allow(unused_variables)]
-    fn final_round_evaluate<'a>(
+    fn prover_evaluate<'a>(
         &self,
-        builder: &mut FinalRoundBuilder<'a, C::Scalar>,
+        builder: &mut ProofBuilder<'a, C::Scalar>,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<C::Scalar>,
     ) -> Vec<Column<'a, C::Scalar>> {
@@ -366,7 +365,7 @@ fn verify_group_by<C: Commitment>(
     reason = "alpha is guaranteed to not be zero in this context"
 )]
 pub fn prove_group_by<'a, S: Scalar>(
-    builder: &mut FinalRoundBuilder<'a, S>,
+    builder: &mut ProofBuilder<'a, S>,
     alloc: &'a Bump,
     alpha: S,
     beta: S,

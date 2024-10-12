@@ -1,13 +1,10 @@
 #![doc = include_str!("README.md")]
-use ark_std::test_rng;
-use blitzar::compute::init_backend;
+
+use blitzar::{compute::init_backend, proof::InnerProductProof};
 use proof_of_sql::{
     base::database::{
         owned_table_utility::{bigint, owned_table, varchar},
         OwnedTableTestAccessor, TestAccessor,
-    },
-    proof_primitive::dory::{
-        DynamicDoryEvaluationProof, ProverSetup, PublicParameters, VerifierSetup,
     },
     sql::{parse::QueryExpr, proof::QueryProof},
 };
@@ -45,11 +42,7 @@ fn main() {
     init_backend();
     end_timer(timer);
     let timer = start_timer("Loading data");
-    let public_parameters = PublicParameters::test_rand(5, &mut test_rng());
-    let prover_setup = ProverSetup::from(&public_parameters);
-    let verifier_setup = VerifierSetup::from(&public_parameters);
-    let mut accessor =
-        OwnedTableTestAccessor::<DynamicDoryEvaluationProof>::new_empty_with_setup(&prover_setup);
+    let mut accessor = OwnedTableTestAccessor::<InnerProductProof>::new_empty_with_setup(());
     accessor.add_table(
         "sxt.table".parse().unwrap(),
         owned_table([
@@ -68,19 +61,11 @@ fn main() {
     .unwrap();
     end_timer(timer);
     let timer = start_timer("Generating Proof");
-    let (proof, serialized_result) = QueryProof::<DynamicDoryEvaluationProof>::new(
-        query.proof_expr(),
-        &accessor,
-        &&prover_setup,
-    );
+    let (proof, serialized_result) =
+        QueryProof::<InnerProductProof>::new(query.proof_expr(), &accessor, &());
     end_timer(timer);
     let timer = start_timer("Verifying Proof");
-    let result = proof.verify(
-        query.proof_expr(),
-        &accessor,
-        &serialized_result,
-        &&verifier_setup,
-    );
+    let result = proof.verify(query.proof_expr(), &accessor, &serialized_result, &());
     end_timer(timer);
     match result {
         Ok(result) => {

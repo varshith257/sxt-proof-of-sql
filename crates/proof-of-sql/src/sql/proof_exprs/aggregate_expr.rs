@@ -6,7 +6,7 @@ use crate::{
         map::IndexSet,
         proof::ProofError,
     },
-    sql::proof::{CountBuilder, FinalRoundBuilder, VerificationBuilder},
+    sql::proof::{CountBuilder, ProofBuilder, VerificationBuilder},
 };
 use alloc::boxed::Box;
 use bumpalo::Bump;
@@ -55,7 +55,7 @@ impl<C: Commitment> ProofExpr<C> for AggregateExpr<C> {
     #[tracing::instrument(name = "AggregateExpr::prover_evaluate", level = "debug", skip_all)]
     fn prover_evaluate<'a>(
         &self,
-        builder: &mut FinalRoundBuilder<'a, C::Scalar>,
+        builder: &mut ProofBuilder<'a, C::Scalar>,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<C::Scalar>,
     ) -> Column<'a, C::Scalar> {

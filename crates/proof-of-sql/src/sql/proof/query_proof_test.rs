@@ -1,5 +1,5 @@
 use super::{
-    CountBuilder, FinalRoundBuilder, ProofPlan, ProverEvaluate, QueryProof, VerificationBuilder,
+    CountBuilder, ProofBuilder, ProofPlan, ProverEvaluate, QueryProof, VerificationBuilder,
 };
 use crate::{
     base::{
@@ -14,7 +14,7 @@ use crate::{
         proof::ProofError,
         scalar::{Curve25519Scalar, Scalar},
     },
-    sql::proof::{FirstRoundBuilder, QueryData, SumcheckSubpolynomialType},
+    sql::proof::{QueryData, ResultBuilder, SumcheckSubpolynomialType},
 };
 use bumpalo::Bump;
 use serde::Serialize;
@@ -43,19 +43,19 @@ impl Default for TrivialTestProofPlan {
 impl<S: Scalar> ProverEvaluate<S> for TrivialTestProofPlan {
     fn result_evaluate<'a>(
         &self,
-        _input_length: usize,
+        builder: &mut ResultBuilder,
         alloc: &'a Bump,
         _accessor: &'a dyn DataAccessor<S>,
     ) -> Vec<Column<'a, S>> {
-        let col = alloc.alloc_slice_fill_copy(self.length, self.column_fill_value);
+        let input_length = self.length;
+        let col = alloc.alloc_slice_fill_copy(input_length, self.column_fill_value);
+        builder.set_result_table_length(input_length);
         vec![Column::BigInt(col)]
     }
 
-    fn first_round_evaluate(&self, _builder: &mut FirstRoundBuilder) {}
-
-    fn final_round_evaluate<'a>(
+    fn prover_evaluate<'a>(
         &self,
-        builder: &mut FinalRoundBuilder<'a, S>,
+        builder: &mut ProofBuilder<'a, S>,
         alloc: &'a Bump,
         _accessor: &'a dyn DataAccessor<S>,
     ) -> Vec<Column<'a, S>> {
@@ -200,19 +200,18 @@ impl Default for SquareTestProofPlan {
 impl<S: Scalar> ProverEvaluate<S> for SquareTestProofPlan {
     fn result_evaluate<'a>(
         &self,
-        _table_length: usize,
+        builder: &mut ResultBuilder,
         alloc: &'a Bump,
         _accessor: &'a dyn DataAccessor<S>,
     ) -> Vec<Column<'a, S>> {
         let res: &[_] = alloc.alloc_slice_copy(&self.res);
+        builder.set_result_table_length(2);
         vec![Column::BigInt(res)]
     }
 
-    fn first_round_evaluate(&self, _builder: &mut FirstRoundBuilder) {}
-
-    fn final_round_evaluate<'a>(
+    fn prover_evaluate<'a>(
         &self,
-        builder: &mut FinalRoundBuilder<'a, S>,
+        builder: &mut ProofBuilder<'a, S>,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<S>,
     ) -> Vec<Column<'a, S>> {
@@ -382,19 +381,18 @@ impl Default for DoubleSquareTestProofPlan {
 impl<S: Scalar> ProverEvaluate<S> for DoubleSquareTestProofPlan {
     fn result_evaluate<'a>(
         &self,
-        _input_length: usize,
+        builder: &mut ResultBuilder,
         alloc: &'a Bump,
         _accessor: &'a dyn DataAccessor<S>,
     ) -> Vec<Column<'a, S>> {
         let res: &[_] = alloc.alloc_slice_copy(&self.res);
+        builder.set_result_table_length(2);
         vec![Column::BigInt(res)]
     }
 
-    fn first_round_evaluate(&self, _builder: &mut FirstRoundBuilder) {}
-
-    fn final_round_evaluate<'a>(
+    fn prover_evaluate<'a>(
         &self,
-        builder: &mut FinalRoundBuilder<'a, S>,
+        builder: &mut ProofBuilder<'a, S>,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<S>,
     ) -> Vec<Column<'a, S>> {
@@ -594,20 +592,18 @@ struct ChallengeTestProofPlan {}
 impl<S: Scalar> ProverEvaluate<S> for ChallengeTestProofPlan {
     fn result_evaluate<'a>(
         &self,
-        _input_length: usize,
+        builder: &mut ResultBuilder,
         _alloc: &'a Bump,
         _accessor: &'a dyn DataAccessor<S>,
     ) -> Vec<Column<'a, S>> {
+        builder.request_post_result_challenges(2);
+        builder.set_result_table_length(2);
         vec![Column::BigInt(&[9, 25])]
     }
 
-    fn first_round_evaluate(&self, builder: &mut FirstRoundBuilder) {
-        builder.request_post_result_challenges(2);
-    }
-
-    fn final_round_evaluate<'a>(
+    fn prover_evaluate<'a>(
         &self,
-        builder: &mut FinalRoundBuilder<'a, S>,
+        builder: &mut ProofBuilder<'a, S>,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<S>,
     ) -> Vec<Column<'a, S>> {

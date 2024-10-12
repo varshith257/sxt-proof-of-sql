@@ -2,10 +2,10 @@
 mod count_builder;
 pub(crate) use count_builder::CountBuilder;
 
-mod final_round_builder;
-pub(crate) use final_round_builder::FinalRoundBuilder;
+mod proof_builder;
+pub(crate) use proof_builder::ProofBuilder;
 #[cfg(all(test, feature = "blitzar"))]
-mod final_round_builder_test;
+mod proof_builder_test;
 
 mod composite_polynomial_builder;
 pub(crate) use composite_polynomial_builder::CompositePolynomialBuilder;
@@ -68,5 +68,5 @@ pub(crate) use result_element_serialization::{
     decode_and_convert, decode_multiple_elements, ProvableResultElement,
 };
 
-mod first_round_builder;
-pub(crate) use first_round_builder::FirstRoundBuilder;
+mod result_builder;
+pub(crate) use result_builder::ResultBuilder;

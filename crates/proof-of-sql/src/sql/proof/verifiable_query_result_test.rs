@@ -1,5 +1,5 @@
 use super::{
-    CountBuilder, FinalRoundBuilder, ProofPlan, ProverEvaluate, VerifiableQueryResult,
+    CountBuilder, ProofBuilder, ProofPlan, ProverEvaluate, VerifiableQueryResult,
     VerificationBuilder,
 };
 use crate::{
@@ -14,7 +14,7 @@ use crate::{
         proof::ProofError,
         scalar::Scalar,
     },
-    sql::proof::{FirstRoundBuilder, ProvableQueryResult, QueryData},
+    sql::proof::{ProvableQueryResult, QueryData, ResultBuilder},
 };
 use bumpalo::Bump;
 use serde::Serialize;
@@ -27,18 +27,18 @@ pub(super) struct EmptyTestQueryExpr {
 impl<S: Scalar> ProverEvaluate<S> for EmptyTestQueryExpr {
     fn result_evaluate<'a>(
         &self,
-        _input_length: usize,
+        builder: &mut ResultBuilder,
         alloc: &'a Bump,
         _accessor: &'a dyn DataAccessor<S>,
     ) -> Vec<Column<'a, S>> {
         let zeros = vec![0; self.length];
         let res: &[_] = alloc.alloc_slice_copy(&zeros);
+        builder.set_result_table_length(self.length);
         vec![Column::BigInt(res); self.columns]
     }
-    fn first_round_evaluate(&self, _builder: &mut FirstRoundBuilder) {}
-    fn final_round_evaluate<'a>(
+    fn prover_evaluate<'a>(
         &self,
-        builder: &mut FinalRoundBuilder<'a, S>,
+        builder: &mut ProofBuilder<'a, S>,
         alloc: &'a Bump,
         _accessor: &'a dyn DataAccessor<S>,
     ) -> Vec<Column<'a, S>> {

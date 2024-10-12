@@ -1,4 +1,4 @@
-use super::{CountBuilder, FinalRoundBuilder, FirstRoundBuilder, VerificationBuilder};
+use super::{CountBuilder, ProofBuilder, ResultBuilder, VerificationBuilder};
 use crate::base::{
     commitment::Commitment,
     database::{
@@ -49,26 +49,23 @@ pub trait ProofPlan<C: Commitment>: Debug + Send + Sync + ProverEvaluate<C::Scal
 }
 
 pub trait ProverEvaluate<S: Scalar> {
-    /// Evaluate the query and modify `FirstRoundBuilder` to track the result of the query.
+    /// Evaluate the query and modify `ResultBuilder` to track the result of the query.
     fn result_evaluate<'a>(
         &self,
-        input_length: usize,
+        builder: &mut ResultBuilder,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<S>,
     ) -> Vec<Column<'a, S>>;
 
-    /// Evaluate the query and modify `FirstRoundBuilder` to form the query's proof.
-    fn first_round_evaluate(&self, builder: &mut FirstRoundBuilder);
-
-    /// Evaluate the query and modify `FinalRoundBuilder` to store an intermediate representation
+    /// Evaluate the query and modify `ProofBuilder` to store an intermediate representation
     /// of the query result and track all the components needed to form the query's proof.
     ///
     /// Intermediate values that are needed to form the proof are allocated into the arena
     /// allocator alloc. These intermediate values will persist through proof creation and
     /// will be bulk deallocated once the proof is formed.
-    fn final_round_evaluate<'a>(
+    fn prover_evaluate<'a>(
         &self,
-        builder: &mut FinalRoundBuilder<'a, S>,
+        builder: &mut ProofBuilder<'a, S>,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<S>,
     ) -> Vec<Column<'a, S>>;

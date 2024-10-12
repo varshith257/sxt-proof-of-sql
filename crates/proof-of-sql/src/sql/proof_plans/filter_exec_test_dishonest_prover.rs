@@ -8,7 +8,7 @@ use crate::{
     },
     sql::{
         proof::{
-            FinalRoundBuilder, FirstRoundBuilder, ProverEvaluate, ProverHonestyMarker, QueryError,
+            ProofBuilder, ProverEvaluate, ProverHonestyMarker, QueryError, ResultBuilder,
             VerifiableQueryResult,
         },
         // Making this explicit to ensure that we don't accidentally use the
@@ -37,10 +37,11 @@ impl ProverEvaluate<Curve25519Scalar> for DishonestFilterExec<RistrettoPoint> {
     )]
     fn result_evaluate<'a>(
         &self,
-        input_length: usize,
+        builder: &mut ResultBuilder,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<Curve25519Scalar>,
     ) -> Vec<Column<'a, Curve25519Scalar>> {
+        let input_length = accessor.get_length(self.table.table_ref);
         // 1. selection
         let selection_column: Column<'a, Curve25519Scalar> =
             self.where_clause
@@ -59,24 +60,22 @@ impl ProverEvaluate<Curve25519Scalar> for DishonestFilterExec<RistrettoPoint> {
             })
             .collect();
         // Compute filtered_columns
-        let (filtered_columns, _) = filter_columns(alloc, &columns, selection);
+        let (filtered_columns, result_len) = filter_columns(alloc, &columns, selection);
+        builder.set_result_table_length(result_len);
         let filtered_columns = tamper_column(alloc, filtered_columns);
+        builder.request_post_result_challenges(2);
         filtered_columns
     }
 
-    fn first_round_evaluate(&self, builder: &mut FirstRoundBuilder) {
-        builder.request_post_result_challenges(2);
-    }
-
     #[tracing::instrument(
-        name = "DishonestFilterExec::final_round_evaluate",
+        name = "DishonestFilterExec::prover_evaluate",
         level = "debug",
         skip_all
     )]
     #[allow(unused_variables)]
-    fn final_round_evaluate<'a>(
+    fn prover_evaluate<'a>(
         &self,
-        builder: &mut FinalRoundBuilder<'a, Curve25519Scalar>,
+        builder: &mut ProofBuilder<'a, Curve25519Scalar>,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<Curve25519Scalar>,
     ) -> Vec<Column<'a, Curve25519Scalar>> {

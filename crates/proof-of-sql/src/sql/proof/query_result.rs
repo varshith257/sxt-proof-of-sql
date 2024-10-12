@@ -3,6 +3,7 @@ use crate::base::{
     proof::ProofError,
     scalar::Scalar,
 };
+use arrow::record_batch::RecordBatch;
 use snafu::Snafu;
 
 /// Verifiable query errors

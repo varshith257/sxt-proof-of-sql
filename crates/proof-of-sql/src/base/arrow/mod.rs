@@ -27,3 +27,14 @@ pub mod record_batch_utility;
 #[cfg(feature = "arrow")]
 /// Module for scalar and i256 conversions.
 pub mod scalar_and_i256_conversions;
+
+#[cfg(feature = "arrow")]
+/// Module for handling conversions between columns and Arrow arrays.
+pub mod column_arrow_conversions;
+
+#[cfg(feature = "arrow")]
+/// Module for managing Arrow query results,
+pub mod arrow_query_result;
+
+#[cfg(all(test, feature = "arrow"))]
+mod final_round_builder_arrow_tests;

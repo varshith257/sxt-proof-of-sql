@@ -10,7 +10,6 @@ use crate::base::database::Column;
 use crate::base::scalar::Scalar;
 use arrow::record_batch::RecordBatch;
 use bumpalo::Bump;
-use curve25519_dalek::RistrettoPoint;
 use proof_of_sql_parser::Identifier;
 
 pub fn batch_to_columns<'a, S: Scalar + 'a>(

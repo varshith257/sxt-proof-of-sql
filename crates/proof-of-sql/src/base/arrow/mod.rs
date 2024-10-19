@@ -6,7 +6,7 @@ pub mod arrow_array_to_column_conversion;
 /// Module for converting between owned and Arrow data structures.
 pub mod owned_and_arrow_conversions;
 
-#[cfg(all(test))]
+#[cfg(test)]
 /// Tests for owned and Arrow conversions.
 mod owned_and_arrow_conversions_test;
 

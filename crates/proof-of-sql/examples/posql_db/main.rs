@@ -5,6 +5,7 @@ mod commit_accessor;
 mod csv_accessor;
 /// TODO: add docs
 mod record_batch_accessor;
+
 use arrow::{
     datatypes::{DataType, Field, Schema},
     record_batch::RecordBatch,

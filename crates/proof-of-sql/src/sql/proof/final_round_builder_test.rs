@@ -1,7 +1,8 @@
-use super::{FinalRoundBuilder, SumcheckRandomScalars};
+use super::{FinalRoundBuilder, ProvableQueryResult, SumcheckRandomScalars};
 use crate::{
     base::{
         commitment::{Commitment, CommittableColumn},
+        database::{Column, ColumnField, ColumnType},
         polynomial::{compute_evaluation_vector, CompositePolynomial, MultilinearExtension},
         scalar::Curve25519Scalar,
     },
@@ -131,6 +132,7 @@ fn we_can_form_an_aggregated_sumcheck_polynomial() {
     assert_eq!(eval, expected_eval);
 }
 
+#[cfg(feature = "arrow")]
 #[test]
 fn we_can_form_the_provable_query_result() {
     let col1: Column<Curve25519Scalar> = Column::BigInt(&[11_i64, 12]);

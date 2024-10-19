@@ -4,7 +4,6 @@ use proof_of_sql_parser::ParseError;
 use snafu::Snafu;
 
 /// Errors that can occur when trying to create or extend a [`TableCommitment`] from a record batch.
-#[cfg(feature = "arrow")]
 #[derive(Debug, Snafu)]
 pub enum RecordBatchToColumnsError {
     /// Error converting from arrow array
@@ -22,7 +21,6 @@ pub enum RecordBatchToColumnsError {
 }
 
 /// Errors that can occur when attempting to append a record batch to a [`TableCommitment`].
-#[cfg(feature = "arrow")]
 #[derive(Debug, Snafu)]
 pub enum AppendRecordBatchTableCommitmentError {
     /// During commitment operation, metadata indicates that operand tables cannot be the same.

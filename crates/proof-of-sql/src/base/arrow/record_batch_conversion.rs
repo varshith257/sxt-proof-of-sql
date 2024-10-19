@@ -17,7 +17,6 @@ use proof_of_sql_parser::Identifier;
 /// This function will return an error if:
 /// - The field name cannot be parsed into an [`Identifier`].
 /// - The conversion of an Arrow array to a [`Column`] fails.
-#[cfg(feature = "arrow")]
 pub fn batch_to_columns<'a, S: Scalar + 'a>(
     batch: &'a RecordBatch,
     alloc: &'a Bump,
@@ -41,7 +40,6 @@ impl<C: Commitment> TableCommitment<C> {
     /// The row offset is assumed to be the end of the [`TableCommitment`]'s current range.
     ///
     /// Will error on a variety of mismatches, or if the provided columns have mixed length.
-    #[cfg(feature = "arrow")]
     #[allow(clippy::missing_panics_doc)]
     pub fn try_append_record_batch(
         &mut self,
@@ -69,7 +67,6 @@ impl<C: Commitment> TableCommitment<C> {
         }
     }
     /// Returns a [`TableCommitment`] to the provided arrow [`RecordBatch`].
-    #[cfg(feature = "arrow")]
     pub fn try_from_record_batch(
         batch: &RecordBatch,
         setup: &C::PublicSetup<'_>,
@@ -79,7 +76,6 @@ impl<C: Commitment> TableCommitment<C> {
 
     /// Returns a [`TableCommitment`] to the provided arrow [`RecordBatch`] with the given row offset.
     #[allow(clippy::missing_panics_doc)]
-    #[cfg(feature = "arrow")]
     pub fn try_from_record_batch_with_offset(
         batch: &RecordBatch,
         offset: usize,
@@ -103,7 +99,7 @@ impl<C: Commitment> TableCommitment<C> {
     }
 }
 
-#[cfg(all(test, feature = "arrow", feature = "blitzar"))]
+#[cfg(all(test, feature = "blitzar"))]
 mod tests {
     use super::*;
     use crate::{base::scalar::Curve25519Scalar, record_batch};

@@ -9,6 +9,7 @@ use crate::{
     sql::proof::SumcheckSubpolynomialType,
 };
 use alloc::sync::Arc;
+#[cfg(feature = "arrow")]
 use arrow::{
     array::Int64Array,
     datatypes::{Field, Schema},

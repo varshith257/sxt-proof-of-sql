@@ -274,7 +274,7 @@ fn main() {
             end_timer(timer);
             println!(
                 "Verified Result: {:?}",
-                RecordBatch::try_from(query_result).unwrap()
+                RecordBatch::try_from(query_result.table).unwrap()
             );
         }
     }

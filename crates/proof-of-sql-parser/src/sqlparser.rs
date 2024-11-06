@@ -1,4 +1,5 @@
 //! This module exists to adapt the current parser to `sqlparser`.
+//! This module exists to adapt the current parser to `sqlparser`.
 use crate::{
     intermediate_ast::{
         AliasedResultExpr, BinaryOperator as PoSqlBinaryOperator, Expression, Literal,
@@ -15,6 +16,19 @@ use sqlparser::ast::{
     ObjectName, Offset, OffsetRows, OrderByExpr, Query, Select, SelectItem, SetExpr, TableFactor,
     TableWithJoins, TimezoneInfo, UnaryOperator, Value, WildcardAdditionalOptions,
 };
+
+/// Convert a number into a [`Expr`].
+fn number<T>(val: T) -> Expr
+where
+    T: Display,
+{
+    Expr::Value(Value::Number(val.to_string(), false))
+}
+
+/// Convert an [`Identifier`] into a [`Expr`].
+fn id(id: Identifier) -> Expr {
+    Expr::Identifier(id.into())
+}
 
 /// Convert a number into a [`Expr`].
 fn number<T>(val: T) -> Expr
@@ -126,6 +140,7 @@ impl From<PoSqlOrderBy> for OrderByExpr {
             OrderByDirection::Desc => Some(false),
         };
         OrderByExpr {
+            expr: id(order_by.expr),
             expr: id(order_by.expr),
             asc,
             nulls_first: None,
@@ -247,7 +262,21 @@ impl From<SelectStatement> for Query {
 
 #[cfg(test)]
 mod test {
+mod test {
     use super::*;
+    use sqlparser::{ast::Statement, dialect::PostgreSqlDialect, parser::Parser};
+
+    /// Check that the intermediate AST can be converted to the SQL parser AST which should functionally match
+    /// the direct conversion from the SQL string.
+    /// Note that the `PoSQL` parser has some quirks:
+    /// - If LIMIT is specified, OFFSET must also be specified so we have to append `OFFSET 0`.
+    /// - Explicit aliases are mandatory for all columns.
+    fn check_posql_intermediate_ast_to_sqlparser_equality(sql: &str) {
+        let dialect = PostgreSqlDialect {};
+        let posql_ast = sql.parse::<SelectStatement>().unwrap();
+        let converted_sqlparser_ast = &Statement::Query(Box::new(Query::from(posql_ast)));
+        let direct_sqlparser_ast = &Parser::parse_sql(&dialect, sql).unwrap()[0];
+        assert_eq!(converted_sqlparser_ast, direct_sqlparser_ast);
     use sqlparser::{ast::Statement, dialect::PostgreSqlDialect, parser::Parser};
 
     /// Check that the intermediate AST can be converted to the SQL parser AST which should functionally match
@@ -264,6 +293,27 @@ mod test {
     }
 
     #[test]
+    fn we_can_convert_posql_intermediate_ast_to_sqlparser() {
+        check_posql_intermediate_ast_to_sqlparser_equality("SELECT * FROM t");
+        check_posql_intermediate_ast_to_sqlparser_equality(
+            "select a as a, 4.7 * b as b from namespace.table where c = 2.5;",
+        );
+        check_posql_intermediate_ast_to_sqlparser_equality(
+            "select a as a, b as b from namespace.table where c = 4;",
+        );
+        check_posql_intermediate_ast_to_sqlparser_equality(
+            "select a as a, b as b from namespace.table where c = 4 order by a desc;",
+        );
+        check_posql_intermediate_ast_to_sqlparser_equality("select 1 as a, 'Meow' as d, b as b from namespace.table where c = 4 order by a desc limit 10 offset 0;");
+        check_posql_intermediate_ast_to_sqlparser_equality(
+            "select true as cons, a and b or c >= 4 as comp from tab where d = 'Space and Time';",
+        );
+        check_posql_intermediate_ast_to_sqlparser_equality(
+            "select cat as cat, true as cons, a and b or c >= 4 as comp from tab where d = 'Space and Time' group by cat;",
+        );
+        check_posql_intermediate_ast_to_sqlparser_equality(
+            "select cat as cat, sum(a) as s, count(*) as rows from tab where d = 'Space and Time' group by cat;",
+        );
     fn we_can_convert_posql_intermediate_ast_to_sqlparser() {
         check_posql_intermediate_ast_to_sqlparser_equality("SELECT * FROM t");
         check_posql_intermediate_ast_to_sqlparser_equality(

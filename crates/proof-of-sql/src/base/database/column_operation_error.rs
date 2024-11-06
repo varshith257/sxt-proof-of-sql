@@ -1,7 +1,7 @@
 use crate::base::{database::ColumnType, math::decimal::DecimalError};
 use alloc::string::String;
 use core::result::Result;
-use proof_of_sql_parser::intermediate_ast::{BinaryOperator, UnaryOperator};
+use proof_of_sql_parser::intermediate_ast::{BinaryOperator, UnaryOperator as PoSqlUnaryOperator};
 use snafu::Snafu;
 
 /// Errors from operations on columns.
@@ -31,7 +31,7 @@ pub enum ColumnOperationError {
     #[snafu(display("{operator:?}(operand: {operand_type:?}) is not supported"))]
     UnaryOperationInvalidColumnType {
         /// `UnaryOperator` that caused the error
-        operator: UnaryOperator,
+        operator: PoSqlUnaryOperator,
         /// `ColumnType` of the operand
         operand_type: ColumnType,
     },

@@ -33,6 +33,7 @@ pub mod resource_id;
 pub use resource_id::ResourceId;
 
 pub mod sqlparser;
+pub mod sqlparser_adapter;
 
 // lalrpop-generated code is not clippy-compliant
 lalrpop_mod!(#[allow(clippy::all, missing_docs, clippy::missing_docs_in_private_items, clippy::pedantic, clippy::missing_panics_doc)] pub sql);

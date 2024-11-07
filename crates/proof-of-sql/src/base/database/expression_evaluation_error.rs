@@ -30,6 +30,12 @@ pub enum ExpressionEvaluationError {
         /// The underlying source error
         source: DecimalError,
     },
+    /// Unsupported unary operator
+    #[snafu(display("Unsupported unary operator: {op}"))]
+    UnsupportedUnaryOperator {
+        /// The unsupported unary operator
+        op: String,
+    },
 }
 
 /// Result type for expression evaluation

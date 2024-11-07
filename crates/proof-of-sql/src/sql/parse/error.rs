@@ -140,7 +140,7 @@ pub enum ConversionError {
         error: String,
     },
 
-    #[snafu(display("Unary operator '{op}' is not supported."))]
+    #[snafu(display("Unsupported unary operator: {op}"))]
     /// Unsupported unary operation
     UnsupportedUnaryOperator {
         /// The unary operator that is unsupported

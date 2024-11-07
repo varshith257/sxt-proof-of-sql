@@ -13,10 +13,11 @@ use alloc::{boxed::Box, string::ToString, vec::Vec};
 use proof_of_sql_parser::{
     intermediate_ast::{
         AggregationOperator, AliasedResultExpr, BinaryOperator, Expression, Literal, OrderBy,
-        SelectResultExpr, Slice, TableExpression, UnaryOperator,
+        SelectResultExpr, Slice, TableExpression, UnaryOperator as PoSqlUnaryOperator,
     },
     Identifier, ResourceId,
 };
+use sqlparser::ast::UnaryOperator;
 
 pub struct QueryContextBuilder<'a> {
     context: QueryContext,
@@ -178,10 +179,11 @@ impl<'a> QueryContextBuilder<'a> {
 
     fn visit_unary_expr(
         &mut self,
-        op: UnaryOperator,
+        op: PoSqlUnaryOperator,
         expr: &Expression,
     ) -> ConversionResult<ColumnType> {
-        match op {
+        let sqlparser_op: UnaryOperator = op.into();
+        match sqlparser_op {
             UnaryOperator::Not => {
                 let dtype = self.visit_expr(expr)?;
                 if dtype != ColumnType::Boolean {
@@ -192,6 +194,10 @@ impl<'a> QueryContextBuilder<'a> {
                 }
                 Ok(ColumnType::Boolean)
             }
+            // Handle unsupported operators
+            _ => Err(ConversionError::UnsupportedUnaryOperator {
+                op: format!("{:?}", sqlparser_op),
+            }),
         }
     }
 

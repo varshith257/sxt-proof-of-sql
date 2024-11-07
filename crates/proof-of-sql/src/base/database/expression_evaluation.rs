@@ -6,12 +6,14 @@ use crate::base::{
         BigDecimalExt,
     },
     scalar::Scalar,
+    sql::parse::ConversionError,
 };
 use alloc::{format, string::ToString, vec};
 use proof_of_sql_parser::{
-    intermediate_ast::{BinaryOperator, Expression, Literal, UnaryOperator},
+    intermediate_ast::{BinaryOperator, Expression, Literal, UnaryOperator as PoSqlUnaryOperator,},
     Identifier,
 };
+use sqlparser::ast::UnaryOperator;
 
 impl<S: Scalar> OwnedTable<S> {
     /// Evaluate an expression on the table.
@@ -68,12 +70,16 @@ impl<S: Scalar> OwnedTable<S> {
 
     fn evaluate_unary_expr(
         &self,
-        op: UnaryOperator,
+        op: PoSqlUnaryOperator,
         expr: &Expression,
     ) -> ExpressionEvaluationResult<OwnedColumn<S>> {
         let column = self.evaluate(expr)?;
-        match op {
+        let sqlparser_op: UnaryOperator = op.into();
+        match sqlparser_op {
             UnaryOperator::Not => Ok(column.element_wise_not()?),
+            _ => Err(ConversionError::UnsupportedUnaryOperator {
+                op: format!("{:?}", sqlparser_op),
+            }),
         }
     }
 

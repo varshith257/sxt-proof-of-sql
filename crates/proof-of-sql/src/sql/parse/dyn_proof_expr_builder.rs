@@ -142,7 +142,7 @@ impl DynProofExprBuilder<'_> {
         match sqlparser_op {
             UnaryOperator::Not => DynProofExpr::try_new_not(expr?),
             // Handle unsupported operators
-            _ => Err(ConversionError::UnsupportedUnaryOperator {
+            _ => Err(UnsupportedUnaryOperator {
                 op: format!("{:?}", sqlparser_op),
             }),
         }

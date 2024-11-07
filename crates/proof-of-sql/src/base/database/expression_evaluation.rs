@@ -1,16 +1,18 @@
 use super::{ExpressionEvaluationError, ExpressionEvaluationResult};
-use crate::base::{
-    database::{OwnedColumn, OwnedTable},
-    math::{
-        decimal::{try_convert_intermediate_decimal_to_scalar, DecimalError, Precision},
-        BigDecimalExt,
+use crate::{
+    base::{
+        database::{OwnedColumn, OwnedTable},
+        math::{
+            decimal::{try_convert_intermediate_decimal_to_scalar, DecimalError, Precision},
+            BigDecimalExt,
+        },
+        scalar::Scalar,
     },
-    scalar::Scalar,
-    sql::parse::ConversionError,
+    sql::parse::ConversionError::UnsupportedUnaryOperator,
 };
 use alloc::{format, string::ToString, vec};
 use proof_of_sql_parser::{
-    intermediate_ast::{BinaryOperator, Expression, Literal, UnaryOperator as PoSqlUnaryOperator,},
+    intermediate_ast::{BinaryOperator, Expression, Literal, UnaryOperator as PoSqlUnaryOperator},
     Identifier,
 };
 use sqlparser::ast::UnaryOperator;
@@ -77,7 +79,7 @@ impl<S: Scalar> OwnedTable<S> {
         let sqlparser_op: UnaryOperator = op.into();
         match sqlparser_op {
             UnaryOperator::Not => Ok(column.element_wise_not()?),
-            _ => Err(ConversionError::UnsupportedUnaryOperator {
+            _ => Err(UnsupportedUnaryOperator {
                 op: format!("{:?}", sqlparser_op),
             }),
         }

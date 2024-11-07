@@ -1,13 +1,16 @@
 use super::{ConversionError, ConversionResult, QueryContext};
-use crate::base::{
-    database::{
-        try_add_subtract_column_types, try_multiply_column_types, ColumnRef, ColumnType,
-        SchemaAccessor, TableRef,
+use crate::{
+    base::{
+        database::{
+            try_add_subtract_column_types, try_multiply_column_types, ColumnRef, ColumnType,
+            SchemaAccessor, TableRef,
+        },
+        math::{
+            decimal::{DecimalError, Precision},
+            BigDecimalExt,
+        },
     },
-    math::{
-        decimal::{DecimalError, Precision},
-        BigDecimalExt,
-    },
+    sql::parse::ConversionError::UnsupportedUnaryOperator,
 };
 use alloc::{boxed::Box, string::ToString, vec::Vec};
 use proof_of_sql_parser::{
@@ -195,7 +198,7 @@ impl<'a> QueryContextBuilder<'a> {
                 Ok(ColumnType::Boolean)
             }
             // Handle unsupported operators
-            _ => Err(ConversionError::UnsupportedUnaryOperator {
+            _ => Err(UnsupportedUnaryOperator {
                 op: format!("{:?}", sqlparser_op),
             }),
         }

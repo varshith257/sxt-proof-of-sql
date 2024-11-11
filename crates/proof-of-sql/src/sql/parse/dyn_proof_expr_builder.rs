@@ -19,10 +19,14 @@ use crate::{
 };
 use alloc::{borrow::ToOwned, boxed::Box, format, string::ToString};
 use proof_of_sql_parser::{
-    intermediate_ast::{AggregationOperator, BinaryOperator, Expression, Literal, UnaryOperator},
+    intermediate_ast::{
+        AggregationOperator, BinaryOperator, Expression, Literal,
+        UnaryOperator as PoSqlUnaryOperator,
+    },
     posql_time::{PoSQLTimeUnit, PoSQLTimestampError},
     Identifier,
 };
+use sqlparser::ast::UnaryOperator;
 
 /// Builder that enables building a `proofs::sql::proof_exprs::DynProofExpr` from
 /// a `proof_of_sql_parser::intermediate_ast::Expression`.
@@ -130,12 +134,17 @@ impl DynProofExprBuilder<'_> {
 
     fn visit_unary_expr(
         &self,
-        op: UnaryOperator,
+        op: PoSqlUnaryOperator,
         expr: &Expression,
     ) -> Result<DynProofExpr, ConversionError> {
         let expr = self.visit_expr(expr);
-        match op {
+        let sqlparser_op: UnaryOperator = op.into();
+        match sqlparser_op {
             UnaryOperator::Not => DynProofExpr::try_new_not(expr?),
+            // Handle unsupported operators
+            _ => Err(ConversionError::UnsupportedOperation {
+                op: format!("{sqlparser_op:?}"),
+            }),
         }
     }
 

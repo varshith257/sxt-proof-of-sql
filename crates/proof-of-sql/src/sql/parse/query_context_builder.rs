@@ -13,10 +13,11 @@ use alloc::{boxed::Box, string::ToString, vec::Vec};
 use proof_of_sql_parser::{
     intermediate_ast::{
         AggregationOperator, AliasedResultExpr, BinaryOperator, Expression, Literal, OrderBy,
-        SelectResultExpr, Slice, TableExpression, UnaryOperator,
+        SelectResultExpr, Slice, TableExpression,
     },
     Identifier, ResourceId,
 };
+use sqlparser::ast::UnaryOperator;
 
 pub struct QueryContextBuilder<'a> {
     context: QueryContext,
@@ -137,7 +138,7 @@ impl<'a> QueryContextBuilder<'a> {
             Expression::Wildcard => Ok(ColumnType::BigInt), // Since COUNT(*) = COUNT(1)
             Expression::Literal(literal) => self.visit_literal(literal),
             Expression::Column(_) => self.visit_column_expr(expr),
-            Expression::Unary { op, expr } => self.visit_unary_expr(*op, expr),
+            Expression::Unary { op, expr } => self.visit_unary_expr((*op).into(), expr),
             Expression::Binary { op, left, right } => self.visit_binary_expr(*op, left, right),
             Expression::Aggregation { op, expr } => self.visit_agg_expr(*op, expr),
         }
@@ -192,6 +193,10 @@ impl<'a> QueryContextBuilder<'a> {
                 }
                 Ok(ColumnType::Boolean)
             }
+            // Handle unsupported operators
+            _ => Err(ConversionError::UnsupportedOperation {
+                op: format!("{op:?}"),
+            }),
         }
     }
 

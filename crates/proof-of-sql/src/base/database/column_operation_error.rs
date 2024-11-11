@@ -2,6 +2,7 @@ use crate::base::{database::ColumnType, math::decimal::DecimalError};
 use alloc::string::String;
 use core::result::Result;
 use snafu::Snafu;
+use sqlparser::ast::UnaryOperator;
 
 /// Errors from operations on columns.
 #[derive(Snafu, Debug, PartialEq, Eq)]
@@ -29,8 +30,8 @@ pub enum ColumnOperationError {
     /// Incorrect `ColumnType` in unary operations
     #[snafu(display("{operator:?}(operand: {operand_type:?}) is not supported"))]
     UnaryOperationInvalidColumnType {
-        /// Unary operator that caused the error
-        operator: String,
+        /// `UnaryOperator` that caused the error
+        operator: UnaryOperator,
         /// `ColumnType` of the operand
         operand_type: ColumnType,
     },

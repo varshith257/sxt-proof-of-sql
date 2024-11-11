@@ -18,6 +18,7 @@ use crate::base::{
 };
 use alloc::string::ToString;
 use core::ops::{Add, Div, Mul, Sub};
+use sqlparser::ast::UnaryOperator;
 
 impl<S: Scalar> OwnedColumn<S> {
     /// Element-wise NOT operation for a column
@@ -25,7 +26,7 @@ impl<S: Scalar> OwnedColumn<S> {
         match self {
             Self::Boolean(values) => Ok(Self::Boolean(slice_not(values))),
             _ => Err(ColumnOperationError::UnaryOperationInvalidColumnType {
-                operator: "NOT".to_string(),
+                operator: UnaryOperator::Not,
                 operand_type: self.column_type(),
             }),
         }

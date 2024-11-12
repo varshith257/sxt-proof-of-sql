@@ -9,9 +9,10 @@ use crate::base::{
 };
 use alloc::{format, string::ToString, vec};
 use proof_of_sql_parser::{
-    intermediate_ast::{BinaryOperator, Expression, Literal, UnaryOperator},
+    intermediate_ast::{BinaryOperator, Expression, Literal},
     Identifier,
 };
+use sqlparser::ast::UnaryOperator;
 
 impl<S: Scalar> OwnedTable<S> {
     /// Evaluate an expression on the table.
@@ -20,7 +21,7 @@ impl<S: Scalar> OwnedTable<S> {
             Expression::Column(identifier) => self.evaluate_column(identifier),
             Expression::Literal(lit) => self.evaluate_literal(lit),
             Expression::Binary { op, left, right } => self.evaluate_binary_expr(*op, left, right),
-            Expression::Unary { op, expr } => self.evaluate_unary_expr(*op, expr),
+            Expression::Unary { op, expr } => self.evaluate_unary_expr((*op).into(), expr),
             _ => Err(ExpressionEvaluationError::Unsupported {
                 expression: format!("Expression {expr:?} is not supported yet"),
             }),
@@ -74,6 +75,10 @@ impl<S: Scalar> OwnedTable<S> {
         let column = self.evaluate(expr)?;
         match op {
             UnaryOperator::Not => Ok(column.element_wise_not()?),
+            // Handle unsupported unary operators
+            _ => Err(ExpressionEvaluationError::Unsupported {
+                expression: format!("Unary operator '{op}' is not supported."),
+            }),
         }
     }
 
@@ -91,10 +96,10 @@ impl<S: Scalar> OwnedTable<S> {
             BinaryOperator::Equal => Ok(left.element_wise_eq(&right)?),
             BinaryOperator::GreaterThanOrEqual => Ok(left.element_wise_ge(&right)?),
             BinaryOperator::LessThanOrEqual => Ok(left.element_wise_le(&right)?),
-            BinaryOperator::Add => Ok((left + right)?),
-            BinaryOperator::Subtract => Ok((left - right)?),
-            BinaryOperator::Multiply => Ok((left * right)?),
-            BinaryOperator::Division => Ok((left / right)?),
+            BinaryOperator::Add => Ok(left.element_wise_add(&right)?),
+            BinaryOperator::Subtract => Ok(left.element_wise_sub(&right)?),
+            BinaryOperator::Multiply => Ok(left.element_wise_mul(&right)?),
+            BinaryOperator::Division => Ok(left.element_wise_div(&right)?),
         }
     }
 }

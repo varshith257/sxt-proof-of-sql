@@ -1,12 +1,8 @@
 use super::{DynProofExpr, ProofExpr};
 use crate::{
     base::{
-        commitment::Commitment,
-        database::{
-            try_multiply_column_types, Column, ColumnRef, ColumnType, CommitmentAccessor,
-            DataAccessor,
-        },
-        map::IndexSet,
+        database::{try_multiply_column_types, Column, ColumnRef, ColumnType, Table},
+        map::{IndexMap, IndexSet},
         proof::ProofError,
         scalar::Scalar,
     },
@@ -50,12 +46,11 @@ impl ProofExpr for MultiplyExpr {
 
     fn result_evaluate<'a, S: Scalar>(
         &self,
-        table_length: usize,
         alloc: &'a Bump,
-        accessor: &'a dyn DataAccessor<S>,
+        table: &Table<'a, S>,
     ) -> Column<'a, S> {
-        let lhs_column: Column<'a, S> = self.lhs.result_evaluate(table_length, alloc, accessor);
-        let rhs_column: Column<'a, S> = self.rhs.result_evaluate(table_length, alloc, accessor);
+        let lhs_column: Column<'a, S> = self.lhs.result_evaluate(alloc, table);
+        let rhs_column: Column<'a, S> = self.rhs.result_evaluate(alloc, table);
         let scalars = multiply_columns(&lhs_column, &rhs_column, alloc);
         Column::Scalar(scalars)
     }
@@ -69,10 +64,10 @@ impl ProofExpr for MultiplyExpr {
         &self,
         builder: &mut FinalRoundBuilder<'a, S>,
         alloc: &'a Bump,
-        accessor: &'a dyn DataAccessor<S>,
+        table: &Table<'a, S>,
     ) -> Column<'a, S> {
-        let lhs_column: Column<'a, S> = self.lhs.prover_evaluate(builder, alloc, accessor);
-        let rhs_column: Column<'a, S> = self.rhs.prover_evaluate(builder, alloc, accessor);
+        let lhs_column: Column<'a, S> = self.lhs.prover_evaluate(builder, alloc, table);
+        let rhs_column: Column<'a, S> = self.rhs.prover_evaluate(builder, alloc, table);
 
         // lhs_times_rhs
         let lhs_times_rhs: &'a [S] = multiply_columns(&lhs_column, &rhs_column, alloc);
@@ -89,11 +84,11 @@ impl ProofExpr for MultiplyExpr {
         Column::Scalar(lhs_times_rhs)
     }
 
-    fn verifier_evaluate<C: Commitment>(
+    fn verifier_evaluate<S: Scalar>(
         &self,
-        builder: &mut VerificationBuilder<C>,
-        accessor: &dyn CommitmentAccessor<C>,
-    ) -> Result<C::Scalar, ProofError> {
+        builder: &mut VerificationBuilder<S>,
+        accessor: &IndexMap<ColumnRef, S>,
+    ) -> Result<S, ProofError> {
         let lhs = self.lhs.verifier_evaluate(builder, accessor)?;
         let rhs = self.rhs.verifier_evaluate(builder, accessor)?;
 

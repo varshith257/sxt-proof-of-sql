@@ -1,11 +1,7 @@
 use super::{CountBuilder, FinalRoundBuilder, FirstRoundBuilder, VerificationBuilder};
 use crate::base::{
-    commitment::Commitment,
-    database::{
-        Column, ColumnField, ColumnRef, CommitmentAccessor, DataAccessor, MetadataAccessor,
-        OwnedTable, TableRef,
-    },
-    map::IndexSet,
+    database::{ColumnField, ColumnRef, DataAccessor, OwnedTable, Table, TableRef},
+    map::{IndexMap, IndexSet},
     proof::ProofError,
     scalar::Scalar,
 };
@@ -19,21 +15,13 @@ pub trait ProofPlan: Debug + Send + Sync + ProverEvaluate {
     /// Count terms used within the Query's proof
     fn count(&self, builder: &mut CountBuilder) -> Result<(), ProofError>;
 
-    /// Check if the input table is empty
-    fn is_empty(&self, accessor: &dyn MetadataAccessor) -> bool {
-        let table_refs = self.get_table_references();
-        table_refs
-            .iter()
-            .all(|table_ref| accessor.get_length(*table_ref) == 0)
-    }
-
     /// Form components needed to verify and proof store into `VerificationBuilder`
-    fn verifier_evaluate<C: Commitment>(
+    fn verifier_evaluate<S: Scalar>(
         &self,
-        builder: &mut VerificationBuilder<C>,
-        accessor: &dyn CommitmentAccessor<C>,
-        result: Option<&OwnedTable<C::Scalar>>,
-    ) -> Result<Vec<C::Scalar>, ProofError>;
+        builder: &mut VerificationBuilder<S>,
+        accessor: &IndexMap<ColumnRef, S>,
+        result: Option<&OwnedTable<S>>,
+    ) -> Result<Vec<S>, ProofError>;
 
     /// Return all the result column fields
     fn get_column_result_fields(&self) -> Vec<ColumnField>;
@@ -47,13 +35,12 @@ pub trait ProofPlan: Debug + Send + Sync + ProverEvaluate {
 
 #[enum_dispatch::enum_dispatch(DynProofPlan)]
 pub trait ProverEvaluate {
-    /// Evaluate the query and modify `FirstRoundBuilder` to track the result of the query.
+    /// Evaluate the query and return the result.
     fn result_evaluate<'a, S: Scalar>(
         &self,
-        input_length: usize,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<S>,
-    ) -> Vec<Column<'a, S>>;
+    ) -> Table<'a, S>;
 
     /// Evaluate the query and modify `FirstRoundBuilder` to form the query's proof.
     fn first_round_evaluate(&self, builder: &mut FirstRoundBuilder);
@@ -69,7 +56,7 @@ pub trait ProverEvaluate {
         builder: &mut FinalRoundBuilder<'a, S>,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<S>,
-    ) -> Vec<Column<'a, S>>;
+    ) -> Table<'a, S>;
 }
 
 /// Marker used as a trait bound for generic [`ProofPlan`] types to indicate the honesty of their implementation.

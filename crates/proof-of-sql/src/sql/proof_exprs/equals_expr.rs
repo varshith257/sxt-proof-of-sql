@@ -1,9 +1,8 @@
 use super::{scale_and_add_subtract_eval, scale_and_subtract, DynProofExpr, ProofExpr};
 use crate::{
     base::{
-        commitment::Commitment,
-        database::{Column, ColumnRef, ColumnType, CommitmentAccessor, DataAccessor},
-        map::IndexSet,
+        database::{Column, ColumnRef, ColumnType, Table},
+        map::{IndexMap, IndexSet},
         proof::ProofError,
         scalar::Scalar,
         slice_ops,
@@ -43,17 +42,16 @@ impl ProofExpr for EqualsExpr {
     #[tracing::instrument(name = "EqualsExpr::result_evaluate", level = "debug", skip_all)]
     fn result_evaluate<'a, S: Scalar>(
         &self,
-        table_length: usize,
         alloc: &'a Bump,
-        accessor: &'a dyn DataAccessor<S>,
+        table: &Table<'a, S>,
     ) -> Column<'a, S> {
-        let lhs_column = self.lhs.result_evaluate(table_length, alloc, accessor);
-        let rhs_column = self.rhs.result_evaluate(table_length, alloc, accessor);
+        let lhs_column = self.lhs.result_evaluate(alloc, table);
+        let rhs_column = self.rhs.result_evaluate(alloc, table);
         let lhs_scale = self.lhs.data_type().scale().unwrap_or(0);
         let rhs_scale = self.rhs.data_type().scale().unwrap_or(0);
         let res = scale_and_subtract(alloc, lhs_column, rhs_column, lhs_scale, rhs_scale, true)
             .expect("Failed to scale and subtract");
-        Column::Boolean(result_evaluate_equals_zero(table_length, alloc, res))
+        Column::Boolean(result_evaluate_equals_zero(table.num_rows(), alloc, res))
     }
 
     #[tracing::instrument(name = "EqualsExpr::prover_evaluate", level = "debug", skip_all)]
@@ -61,10 +59,10 @@ impl ProofExpr for EqualsExpr {
         &self,
         builder: &mut FinalRoundBuilder<'a, S>,
         alloc: &'a Bump,
-        accessor: &'a dyn DataAccessor<S>,
+        table: &Table<'a, S>,
     ) -> Column<'a, S> {
-        let lhs_column = self.lhs.prover_evaluate(builder, alloc, accessor);
-        let rhs_column = self.rhs.prover_evaluate(builder, alloc, accessor);
+        let lhs_column = self.lhs.prover_evaluate(builder, alloc, table);
+        let rhs_column = self.rhs.prover_evaluate(builder, alloc, table);
         let lhs_scale = self.lhs.data_type().scale().unwrap_or(0);
         let rhs_scale = self.rhs.data_type().scale().unwrap_or(0);
         let res = scale_and_subtract(alloc, lhs_column, rhs_column, lhs_scale, rhs_scale, true)
@@ -72,11 +70,11 @@ impl ProofExpr for EqualsExpr {
         Column::Boolean(prover_evaluate_equals_zero(builder, alloc, res))
     }
 
-    fn verifier_evaluate<C: Commitment>(
+    fn verifier_evaluate<S: Scalar>(
         &self,
-        builder: &mut VerificationBuilder<C>,
-        accessor: &dyn CommitmentAccessor<C>,
-    ) -> Result<C::Scalar, ProofError> {
+        builder: &mut VerificationBuilder<S>,
+        accessor: &IndexMap<ColumnRef, S>,
+    ) -> Result<S, ProofError> {
         let lhs_eval = self.lhs.verifier_evaluate(builder, accessor)?;
         let rhs_eval = self.rhs.verifier_evaluate(builder, accessor)?;
         let lhs_scale = self.lhs.data_type().scale().unwrap_or(0);
@@ -145,10 +143,10 @@ pub fn prover_evaluate_equals_zero<'a, S: Scalar>(
     selection
 }
 
-pub fn verifier_evaluate_equals_zero<C: Commitment>(
-    builder: &mut VerificationBuilder<C>,
-    lhs_eval: C::Scalar,
-) -> C::Scalar {
+pub fn verifier_evaluate_equals_zero<S: Scalar>(
+    builder: &mut VerificationBuilder<S>,
+    lhs_eval: S,
+) -> S {
     // consume mle evaluations
     let lhs_pseudo_inv_eval = builder.consume_intermediate_mle();
     let selection_not_eval = builder.consume_intermediate_mle();

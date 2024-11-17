@@ -4,13 +4,14 @@ use super::{
 };
 use crate::{
     base::{
-        commitment::{Commitment, InnerProductProof},
+        commitment::InnerProductProof,
         database::{
             owned_table_utility::{bigint, owned_table},
-            Column, ColumnField, ColumnRef, ColumnType, CommitmentAccessor, DataAccessor,
-            OwnedTable, OwnedTableTestAccessor, TableRef,
+            table_utility::*,
+            ColumnField, ColumnRef, ColumnType, DataAccessor, OwnedTable, OwnedTableTestAccessor,
+            Table, TableRef,
         },
-        map::{indexset, IndexSet},
+        map::{indexset, IndexMap, IndexSet},
         proof::ProofError,
         scalar::Scalar,
     },
@@ -27,13 +28,14 @@ pub(super) struct EmptyTestQueryExpr {
 impl ProverEvaluate for EmptyTestQueryExpr {
     fn result_evaluate<'a, S: Scalar>(
         &self,
-        _input_length: usize,
         alloc: &'a Bump,
         _accessor: &'a dyn DataAccessor<S>,
-    ) -> Vec<Column<'a, S>> {
-        let zeros = vec![0; self.length];
-        let res: &[_] = alloc.alloc_slice_copy(&zeros);
-        vec![Column::BigInt(res); self.columns]
+    ) -> Table<'a, S> {
+        let zeros = vec![0_i64; self.length];
+        table_with_row_count(
+            (1..=self.columns).map(|i| borrowed_bigint(format!("a{i}"), zeros.clone(), alloc)),
+            self.length,
+        )
     }
     fn first_round_evaluate(&self, _builder: &mut FirstRoundBuilder) {}
     fn final_round_evaluate<'a, S: Scalar>(
@@ -41,13 +43,16 @@ impl ProverEvaluate for EmptyTestQueryExpr {
         builder: &mut FinalRoundBuilder<'a, S>,
         alloc: &'a Bump,
         _accessor: &'a dyn DataAccessor<S>,
-    ) -> Vec<Column<'a, S>> {
-        let zeros = vec![0; self.length];
+    ) -> Table<'a, S> {
+        let zeros = vec![0_i64; self.length];
         let res: &[_] = alloc.alloc_slice_copy(&zeros);
         let _ = std::iter::repeat_with(|| builder.produce_intermediate_mle(res))
             .take(self.columns)
             .collect::<Vec<_>>();
-        vec![Column::BigInt(res); self.columns]
+        table_with_row_count(
+            (1..=self.columns).map(|i| borrowed_bigint(format!("a{i}"), zeros.clone(), alloc)),
+            self.length,
+        )
     }
 }
 impl ProofPlan for EmptyTestQueryExpr {
@@ -56,18 +61,18 @@ impl ProofPlan for EmptyTestQueryExpr {
         Ok(())
     }
 
-    fn verifier_evaluate<C: Commitment>(
+    fn verifier_evaluate<S: Scalar>(
         &self,
-        builder: &mut VerificationBuilder<C>,
-        _accessor: &dyn CommitmentAccessor<C>,
-        _result: Option<&OwnedTable<<C as Commitment>::Scalar>>,
-    ) -> Result<Vec<C::Scalar>, ProofError> {
+        builder: &mut VerificationBuilder<S>,
+        _accessor: &IndexMap<ColumnRef, S>,
+        _result: Option<&OwnedTable<S>>,
+    ) -> Result<Vec<S>, ProofError> {
         let _ = std::iter::repeat_with(|| {
-            assert_eq!(builder.consume_intermediate_mle(), C::Scalar::ZERO);
+            assert_eq!(builder.consume_intermediate_mle(), S::ZERO);
         })
         .take(self.columns)
         .collect::<Vec<_>>();
-        Ok(vec![C::Scalar::ZERO])
+        Ok(vec![S::ZERO])
     }
 
     fn get_column_result_fields(&self) -> Vec<ColumnField> {
@@ -77,7 +82,7 @@ impl ProofPlan for EmptyTestQueryExpr {
     }
 
     fn get_column_references(&self) -> IndexSet<ColumnRef> {
-        unimplemented!("no real usage for this function yet")
+        indexset! {}
     }
 
     fn get_table_references(&self) -> IndexSet<TableRef> {
@@ -91,10 +96,9 @@ fn we_can_verify_queries_on_an_empty_table() {
         columns: 1,
         ..Default::default()
     };
-    let column: Vec<i64> = vec![0_i64; 0];
     let accessor = OwnedTableTestAccessor::<InnerProductProof>::new_from_table(
         "sxt.test".parse().unwrap(),
-        owned_table([bigint("a1", column)]),
+        owned_table([bigint("a1", [0_i64; 0])]),
         0,
         (),
     );
@@ -113,10 +117,9 @@ fn empty_verification_fails_if_the_result_contains_non_null_members() {
         columns: 1,
         ..Default::default()
     };
-    let column: Vec<i64> = vec![0_i64; 0];
     let accessor = OwnedTableTestAccessor::<InnerProductProof>::new_from_table(
         "sxt.test".parse().unwrap(),
-        owned_table([bigint("a1", column)]),
+        owned_table([bigint("a1", [0_i64; 0])]),
         0,
         (),
     );

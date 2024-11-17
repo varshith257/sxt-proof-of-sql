@@ -17,6 +17,14 @@ pub use column_type_operation::{
     try_add_subtract_column_types, try_divide_column_types, try_multiply_column_types,
 };
 
+mod column_arithmetic_operation;
+pub(super) use column_arithmetic_operation::{AddOp, ArithmeticOp, DivOp, MulOp, SubOp};
+
+mod column_comparison_operation;
+pub(super) use column_comparison_operation::{
+    ComparisonOp, EqualOp, GreaterThanOrEqualOp, LessThanOrEqualOp,
+};
+
 mod column_operation_error;
 pub use column_operation_error::{ColumnOperationError, ColumnOperationResult};
 
@@ -56,6 +64,14 @@ pub(crate) use owned_table::OwnedTableError;
 mod owned_table_test;
 pub mod owned_table_utility;
 
+mod table;
+#[cfg(test)]
+pub(crate) use table::TableError;
+pub use table::{Table, TableOptions};
+#[cfg(test)]
+mod table_test;
+pub mod table_utility;
+
 /// TODO: add docs
 pub(crate) mod expression_evaluation;
 mod expression_evaluation_error;
@@ -65,9 +81,6 @@ pub use expression_evaluation_error::{ExpressionEvaluationError, ExpressionEvalu
 
 mod test_accessor;
 pub use test_accessor::TestAccessor;
-#[cfg(test)]
-#[allow(unused_imports)]
-pub(crate) use test_accessor::UnimplementedTestAccessor;
 
 #[cfg(test)]
 mod test_schema_accessor;
@@ -78,6 +91,11 @@ mod owned_table_test_accessor;
 pub use owned_table_test_accessor::OwnedTableTestAccessor;
 #[cfg(all(test, feature = "blitzar"))]
 mod owned_table_test_accessor_test;
+
+mod table_test_accessor;
+pub use table_test_accessor::TableTestAccessor;
+#[cfg(all(test, feature = "blitzar"))]
+mod table_test_accessor_test;
 
 /// TODO: add docs
 pub(crate) mod filter_util;

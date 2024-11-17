@@ -1,6 +1,8 @@
 use super::OwnedColumn;
-use crate::base::{map::IndexMap, scalar::Scalar};
+use crate::base::{map::IndexMap, polynomial::compute_evaluation_vector, scalar::Scalar};
+use alloc::{vec, vec::Vec};
 use proof_of_sql_parser::Identifier;
+use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
 /// An error that occurs when working with tables.
@@ -15,7 +17,7 @@ pub enum OwnedTableError {
 /// This is primarily used as an internal result that is used before
 /// converting to the final result in either Arrow format or JSON.
 /// This is the analog of an arrow [`RecordBatch`](arrow::record_batch::RecordBatch).
-#[derive(Debug, Clone, Eq)]
+#[derive(Debug, Clone, Eq, Serialize, Deserialize)]
 pub struct OwnedTable<S: Scalar> {
     table: IndexMap<Identifier, OwnedColumn<S>>,
 }
@@ -70,6 +72,15 @@ impl<S: Scalar> OwnedTable<S> {
     /// Returns the columns of this table as an Iterator
     pub fn column_names(&self) -> impl Iterator<Item = &Identifier> {
         self.table.keys()
+    }
+
+    pub(crate) fn mle_evaluations(&self, evaluation_point: &[S]) -> Vec<S> {
+        let mut evaluation_vector = vec![S::ZERO; self.num_rows()];
+        compute_evaluation_vector(&mut evaluation_vector, evaluation_point);
+        self.table
+            .values()
+            .map(|column| column.inner_product(&evaluation_vector))
+            .collect()
     }
 }
 

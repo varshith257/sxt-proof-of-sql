@@ -4,9 +4,8 @@ use super::{
 };
 use crate::{
     base::{
-        commitment::Commitment,
-        database::{Column, ColumnRef, ColumnType, CommitmentAccessor, DataAccessor, LiteralValue},
-        map::IndexSet,
+        database::{Column, ColumnRef, ColumnType, LiteralValue, Table},
+        map::{IndexMap, IndexSet},
         proof::ProofError,
         scalar::Scalar,
     },
@@ -18,8 +17,9 @@ use crate::{
 use alloc::{boxed::Box, string::ToString};
 use bumpalo::Bump;
 use core::fmt::Debug;
-use proof_of_sql_parser::intermediate_ast::{AggregationOperator, BinaryOperator};
+use proof_of_sql_parser::intermediate_ast::AggregationOperator;
 use serde::{Deserialize, Serialize};
+use sqlparser::ast::BinaryOperator;
 
 /// Enum of AST column expression types that implement `ProofExpr`. Is itself a `ProofExpr`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -76,7 +76,7 @@ impl DynProofExpr {
     pub fn try_new_equals(lhs: DynProofExpr, rhs: DynProofExpr) -> ConversionResult<Self> {
         let lhs_datatype = lhs.data_type();
         let rhs_datatype = rhs.data_type();
-        if type_check_binary_operation(&lhs_datatype, &rhs_datatype, BinaryOperator::Equal) {
+        if type_check_binary_operation(&lhs_datatype, &rhs_datatype, &BinaryOperator::Eq) {
             Ok(Self::Equals(EqualsExpr::new(Box::new(lhs), Box::new(rhs))))
         } else {
             Err(ConversionError::DataTypeMismatch {
@@ -93,11 +93,7 @@ impl DynProofExpr {
     ) -> ConversionResult<Self> {
         let lhs_datatype = lhs.data_type();
         let rhs_datatype = rhs.data_type();
-        if type_check_binary_operation(
-            &lhs_datatype,
-            &rhs_datatype,
-            BinaryOperator::LessThanOrEqual,
-        ) {
+        if type_check_binary_operation(&lhs_datatype, &rhs_datatype, &BinaryOperator::LtEq) {
             Ok(Self::Inequality(InequalityExpr::new(
                 Box::new(lhs),
                 Box::new(rhs),
@@ -115,7 +111,7 @@ impl DynProofExpr {
     pub fn try_new_add(lhs: DynProofExpr, rhs: DynProofExpr) -> ConversionResult<Self> {
         let lhs_datatype = lhs.data_type();
         let rhs_datatype = rhs.data_type();
-        if type_check_binary_operation(&lhs_datatype, &rhs_datatype, BinaryOperator::Add) {
+        if type_check_binary_operation(&lhs_datatype, &rhs_datatype, &BinaryOperator::Plus) {
             Ok(Self::AddSubtract(AddSubtractExpr::new(
                 Box::new(lhs),
                 Box::new(rhs),
@@ -133,7 +129,7 @@ impl DynProofExpr {
     pub fn try_new_subtract(lhs: DynProofExpr, rhs: DynProofExpr) -> ConversionResult<Self> {
         let lhs_datatype = lhs.data_type();
         let rhs_datatype = rhs.data_type();
-        if type_check_binary_operation(&lhs_datatype, &rhs_datatype, BinaryOperator::Subtract) {
+        if type_check_binary_operation(&lhs_datatype, &rhs_datatype, &BinaryOperator::Minus) {
             Ok(Self::AddSubtract(AddSubtractExpr::new(
                 Box::new(lhs),
                 Box::new(rhs),
@@ -151,7 +147,7 @@ impl DynProofExpr {
     pub fn try_new_multiply(lhs: DynProofExpr, rhs: DynProofExpr) -> ConversionResult<Self> {
         let lhs_datatype = lhs.data_type();
         let rhs_datatype = rhs.data_type();
-        if type_check_binary_operation(&lhs_datatype, &rhs_datatype, BinaryOperator::Multiply) {
+        if type_check_binary_operation(&lhs_datatype, &rhs_datatype, &BinaryOperator::Multiply) {
             Ok(Self::Multiply(MultiplyExpr::new(
                 Box::new(lhs),
                 Box::new(rhs),

@@ -22,12 +22,12 @@ macro_rules! indexmap_macro {
 }
 
 /// Create an [`IndexSet`][self::IndexSet] from a list of values
-#[cfg(test)]
 macro_rules! indexset_macro {
     ($($value:expr,)+) => { $crate::base::map::indexset!($($value),+) };
     ($($value:expr),*) => {
         {
             const CAP: usize = <[()]>::len(&[$({ stringify!($value); }),*]);
+            #[allow(unused_mut)]
             let mut set = $crate::base::map::IndexSet::with_capacity_and_hasher(CAP, <_>::default());
             $(
                 set.insert($value);
@@ -38,5 +38,4 @@ macro_rules! indexset_macro {
 }
 
 pub(crate) use indexmap_macro as indexmap;
-#[cfg(test)]
 pub(crate) use indexset_macro as indexset;

@@ -1,12 +1,11 @@
 use super::{fold_columns, fold_vals};
 use crate::{
     base::{
-        commitment::Commitment,
         database::{
-            filter_util::filter_columns, Column, ColumnField, ColumnRef, CommitmentAccessor,
-            DataAccessor, OwnedTable, TableRef,
+            filter_util::filter_columns, Column, ColumnField, ColumnRef, DataAccessor, OwnedTable,
+            Table, TableOptions, TableRef,
         },
-        map::IndexSet,
+        map::{IndexMap, IndexSet},
         proof::ProofError,
         scalar::Scalar,
         slice_ops,
@@ -74,12 +73,12 @@ where
     }
 
     #[allow(unused_variables)]
-    fn verifier_evaluate<C: Commitment>(
+    fn verifier_evaluate<S: Scalar>(
         &self,
-        builder: &mut VerificationBuilder<C>,
-        accessor: &dyn CommitmentAccessor<C>,
-        _result: Option<&OwnedTable<C::Scalar>>,
-    ) -> Result<Vec<C::Scalar>, ProofError> {
+        builder: &mut VerificationBuilder<S>,
+        accessor: &IndexMap<ColumnRef, S>,
+        _result: Option<&OwnedTable<S>>,
+    ) -> Result<Vec<S>, ProofError> {
         // 1. selection
         let selection_eval = self.where_clause.verifier_evaluate(builder, accessor)?;
         // 2. columns
@@ -140,32 +139,35 @@ impl ProverEvaluate for FilterExec {
     #[tracing::instrument(name = "FilterExec::result_evaluate", level = "debug", skip_all)]
     fn result_evaluate<'a, S: Scalar>(
         &self,
-        input_length: usize,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<S>,
-    ) -> Vec<Column<'a, S>> {
+    ) -> Table<'a, S> {
+        let column_refs = self.get_column_references();
+        let used_table = accessor.get_table(self.table.table_ref, &column_refs);
         // 1. selection
-        let selection_column: Column<'a, S> =
-            self.where_clause
-                .result_evaluate(input_length, alloc, accessor);
+        let selection_column: Column<'a, S> = self.where_clause.result_evaluate(alloc, &used_table);
         let selection = selection_column
             .as_boolean()
             .expect("selection is not boolean");
+        let output_length = selection.iter().filter(|b| **b).count();
 
         // 2. columns
         let columns: Vec<_> = self
             .aliased_results
             .iter()
-            .map(|aliased_expr| {
-                aliased_expr
-                    .expr
-                    .result_evaluate(input_length, alloc, accessor)
-            })
+            .map(|aliased_expr| aliased_expr.expr.result_evaluate(alloc, &used_table))
             .collect();
 
         // Compute filtered_columns and indexes
         let (filtered_columns, _) = filter_columns(alloc, &columns, selection);
-        filtered_columns
+        Table::<'a, S>::try_from_iter_with_options(
+            self.aliased_results
+                .iter()
+                .map(|expr| expr.alias)
+                .zip(filtered_columns),
+            TableOptions::new(Some(output_length)),
+        )
+        .expect("Failed to create table from iterator")
     }
 
     fn first_round_evaluate(&self, builder: &mut FirstRoundBuilder) {
@@ -179,19 +181,27 @@ impl ProverEvaluate for FilterExec {
         builder: &mut FinalRoundBuilder<'a, S>,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<S>,
-    ) -> Vec<Column<'a, S>> {
+    ) -> Table<'a, S> {
+        let column_refs = self.get_column_references();
+        let used_table = accessor.get_table(self.table.table_ref, &column_refs);
         // 1. selection
         let selection_column: Column<'a, S> =
-            self.where_clause.prover_evaluate(builder, alloc, accessor);
+            self.where_clause
+                .prover_evaluate(builder, alloc, &used_table);
         let selection = selection_column
             .as_boolean()
             .expect("selection is not boolean");
+        let output_length = selection.iter().filter(|b| **b).count();
 
         // 2. columns
         let columns: Vec<_> = self
             .aliased_results
             .iter()
-            .map(|aliased_expr| aliased_expr.expr.prover_evaluate(builder, alloc, accessor))
+            .map(|aliased_expr| {
+                aliased_expr
+                    .expr
+                    .prover_evaluate(builder, alloc, &used_table)
+            })
             .collect();
         // Compute filtered_columns
         let (filtered_columns, result_len) = filter_columns(alloc, &columns, selection);
@@ -213,18 +223,25 @@ impl ProverEvaluate for FilterExec {
             &filtered_columns,
             result_len,
         );
-        filtered_columns
+        Table::<'a, S>::try_from_iter_with_options(
+            self.aliased_results
+                .iter()
+                .map(|expr| expr.alias)
+                .zip(filtered_columns),
+            TableOptions::new(Some(output_length)),
+        )
+        .expect("Failed to create table from iterator")
     }
 }
 
 #[allow(clippy::unnecessary_wraps)]
-fn verify_filter<C: Commitment>(
-    builder: &mut VerificationBuilder<C>,
-    alpha: C::Scalar,
-    beta: C::Scalar,
-    c_evals: &[C::Scalar],
-    s_eval: C::Scalar,
-    d_evals: &[C::Scalar],
+fn verify_filter<S: Scalar>(
+    builder: &mut VerificationBuilder<S>,
+    alpha: S,
+    beta: S,
+    c_evals: &[S],
+    s_eval: S,
+    d_evals: &[S],
 ) -> Result<(), ProofError> {
     let one_eval = builder.mle_evaluations.input_one_evaluation;
     let chi_eval = builder.mle_evaluations.output_one_evaluation;

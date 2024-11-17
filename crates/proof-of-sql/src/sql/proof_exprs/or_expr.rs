@@ -1,9 +1,8 @@
 use super::{DynProofExpr, ProofExpr};
 use crate::{
     base::{
-        commitment::Commitment,
-        database::{Column, ColumnRef, ColumnType, CommitmentAccessor, DataAccessor},
-        map::IndexSet,
+        database::{Column, ColumnRef, ColumnType, Table},
+        map::{IndexMap, IndexSet},
         proof::ProofError,
         scalar::Scalar,
     },
@@ -42,15 +41,14 @@ impl ProofExpr for OrExpr {
     #[tracing::instrument(name = "OrExpr::result_evaluate", level = "debug", skip_all)]
     fn result_evaluate<'a, S: Scalar>(
         &self,
-        table_length: usize,
         alloc: &'a Bump,
-        accessor: &'a dyn DataAccessor<S>,
+        table: &Table<'a, S>,
     ) -> Column<'a, S> {
-        let lhs_column: Column<'a, S> = self.lhs.result_evaluate(table_length, alloc, accessor);
-        let rhs_column: Column<'a, S> = self.rhs.result_evaluate(table_length, alloc, accessor);
+        let lhs_column: Column<'a, S> = self.lhs.result_evaluate(alloc, table);
+        let rhs_column: Column<'a, S> = self.rhs.result_evaluate(alloc, table);
         let lhs = lhs_column.as_boolean().expect("lhs is not boolean");
         let rhs = rhs_column.as_boolean().expect("rhs is not boolean");
-        Column::Boolean(result_evaluate_or(table_length, alloc, lhs, rhs))
+        Column::Boolean(result_evaluate_or(table.num_rows(), alloc, lhs, rhs))
     }
 
     #[tracing::instrument(name = "OrExpr::prover_evaluate", level = "debug", skip_all)]
@@ -58,20 +56,20 @@ impl ProofExpr for OrExpr {
         &self,
         builder: &mut FinalRoundBuilder<'a, S>,
         alloc: &'a Bump,
-        accessor: &'a dyn DataAccessor<S>,
+        table: &Table<'a, S>,
     ) -> Column<'a, S> {
-        let lhs_column: Column<'a, S> = self.lhs.prover_evaluate(builder, alloc, accessor);
-        let rhs_column: Column<'a, S> = self.rhs.prover_evaluate(builder, alloc, accessor);
+        let lhs_column: Column<'a, S> = self.lhs.prover_evaluate(builder, alloc, table);
+        let rhs_column: Column<'a, S> = self.rhs.prover_evaluate(builder, alloc, table);
         let lhs = lhs_column.as_boolean().expect("lhs is not boolean");
         let rhs = rhs_column.as_boolean().expect("rhs is not boolean");
         Column::Boolean(prover_evaluate_or(builder, alloc, lhs, rhs))
     }
 
-    fn verifier_evaluate<C: Commitment>(
+    fn verifier_evaluate<S: Scalar>(
         &self,
-        builder: &mut VerificationBuilder<C>,
-        accessor: &dyn CommitmentAccessor<C>,
-    ) -> Result<C::Scalar, ProofError> {
+        builder: &mut VerificationBuilder<S>,
+        accessor: &IndexMap<ColumnRef, S>,
+    ) -> Result<S, ProofError> {
         let lhs = self.lhs.verifier_evaluate(builder, accessor)?;
         let rhs = self.rhs.verifier_evaluate(builder, accessor)?;
 
@@ -129,11 +127,11 @@ pub fn prover_evaluate_or<'a, S: Scalar>(
     alloc.alloc_slice_fill_with(n, |i| lhs[i] || rhs[i])
 }
 
-pub fn verifier_evaluate_or<C: Commitment>(
-    builder: &mut VerificationBuilder<C>,
-    lhs: &C::Scalar,
-    rhs: &C::Scalar,
-) -> C::Scalar {
+pub fn verifier_evaluate_or<S: Scalar>(
+    builder: &mut VerificationBuilder<S>,
+    lhs: &S,
+    rhs: &S,
+) -> S {
     // lhs_and_rhs
     let lhs_and_rhs = builder.consume_intermediate_mle();
 

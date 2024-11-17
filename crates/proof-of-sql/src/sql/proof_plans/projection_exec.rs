@@ -1,10 +1,9 @@
 use crate::{
     base::{
-        commitment::Commitment,
         database::{
-            Column, ColumnField, ColumnRef, CommitmentAccessor, DataAccessor, OwnedTable, TableRef,
+            ColumnField, ColumnRef, DataAccessor, OwnedTable, Table, TableOptions, TableRef,
         },
-        map::IndexSet,
+        map::{IndexMap, IndexSet},
         proof::ProofError,
         scalar::Scalar,
     },
@@ -51,12 +50,12 @@ impl ProofPlan for ProjectionExec {
     }
 
     #[allow(unused_variables)]
-    fn verifier_evaluate<C: Commitment>(
+    fn verifier_evaluate<S: Scalar>(
         &self,
-        builder: &mut VerificationBuilder<C>,
-        accessor: &dyn CommitmentAccessor<C>,
-        _result: Option<&OwnedTable<C::Scalar>>,
-    ) -> Result<Vec<C::Scalar>, ProofError> {
+        builder: &mut VerificationBuilder<S>,
+        accessor: &IndexMap<ColumnRef, S>,
+        _result: Option<&OwnedTable<S>>,
+    ) -> Result<Vec<S>, ProofError> {
         self.aliased_results
             .iter()
             .map(|aliased_expr| aliased_expr.expr.verifier_evaluate(builder, accessor))
@@ -90,20 +89,21 @@ impl ProverEvaluate for ProjectionExec {
     #[tracing::instrument(name = "ProjectionExec::result_evaluate", level = "debug", skip_all)]
     fn result_evaluate<'a, S: Scalar>(
         &self,
-        input_length: usize,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<S>,
-    ) -> Vec<Column<'a, S>> {
-        let columns: Vec<_> = self
-            .aliased_results
-            .iter()
-            .map(|aliased_expr| {
-                aliased_expr
-                    .expr
-                    .result_evaluate(input_length, alloc, accessor)
-            })
-            .collect();
-        columns
+    ) -> Table<'a, S> {
+        let column_refs = self.get_column_references();
+        let used_table = accessor.get_table(self.table.table_ref, &column_refs);
+        Table::<'a, S>::try_from_iter_with_options(
+            self.aliased_results.iter().map(|aliased_expr| {
+                (
+                    aliased_expr.alias,
+                    aliased_expr.expr.result_evaluate(alloc, &used_table),
+                )
+            }),
+            TableOptions::new(Some(accessor.get_length(self.table.table_ref))),
+        )
+        .expect("Failed to create table from iterator")
     }
 
     fn first_round_evaluate(&self, _builder: &mut FirstRoundBuilder) {}
@@ -119,15 +119,24 @@ impl ProverEvaluate for ProjectionExec {
         builder: &mut FinalRoundBuilder<'a, S>,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<S>,
-    ) -> Vec<Column<'a, S>> {
+    ) -> Table<'a, S> {
+        let column_refs = self.get_column_references();
+        let used_table = accessor.get_table(self.table.table_ref, &column_refs);
         // 1. Evaluate result expressions
-        let res: Vec<_> = self
-            .aliased_results
-            .iter()
-            .map(|aliased_expr| aliased_expr.expr.prover_evaluate(builder, alloc, accessor))
-            .collect();
+        let res = Table::<'a, S>::try_from_iter_with_options(
+            self.aliased_results.iter().map(|aliased_expr| {
+                (
+                    aliased_expr.alias,
+                    aliased_expr
+                        .expr
+                        .prover_evaluate(builder, alloc, &used_table),
+                )
+            }),
+            TableOptions::new(Some(accessor.get_length(self.table.table_ref))),
+        )
+        .expect("Failed to create table from iterator");
         // 2. Produce MLEs
-        res.clone().into_iter().for_each(|column| {
+        res.inner_table().values().for_each(|column| {
             builder.produce_intermediate_mle(column.as_scalar(alloc));
         });
         res

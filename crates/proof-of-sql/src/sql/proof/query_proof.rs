@@ -6,7 +6,8 @@ use crate::{
     base::{
         bit::BitDistribution,
         commitment::CommitmentEvaluationProof,
-        database::{Column, CommitmentAccessor, DataAccessor, MetadataAccessor, TableRef},
+        database::{CommitmentAccessor, DataAccessor, MetadataAccessor, TableRef},
+        map::IndexMap,
         math::log2_up,
         polynomial::{compute_evaluation_vector, CompositePolynomialInfo},
         proof::{Keccak256Transcript, ProofError, Transcript},
@@ -75,9 +76,7 @@ impl<CP: CommitmentEvaluationProof> QueryProof<CP> {
         let alloc = Bump::new();
 
         // Evaluate query result
-        let result_cols = expr.result_evaluate(range_length, &alloc, accessor);
-        let output_length = result_cols.first().map_or(0, Column::len);
-        let provable_result = ProvableQueryResult::new(output_length as u64, &result_cols);
+        let provable_result = expr.result_evaluate(&alloc, accessor).into();
 
         // Prover First Round
         let mut first_round_builder = FirstRoundBuilder::new();
@@ -99,6 +98,11 @@ impl<CP: CommitmentEvaluationProof> QueryProof<CP> {
 
         let mut builder =
             FinalRoundBuilder::new(range_length, num_sumcheck_variables, post_result_challenges);
+
+        expr.get_column_references().into_iter().for_each(|col| {
+            builder.produce_anchored_mle(accessor.get_column(col));
+        });
+
         expr.final_round_evaluate(&mut builder, &alloc, accessor);
 
         let num_sumcheck_variables = builder.num_sumcheck_variables();
@@ -169,12 +173,12 @@ impl<CP: CommitmentEvaluationProof> QueryProof<CP> {
         result: &ProvableQueryResult,
         setup: &CP::VerifierPublicSetup<'_>,
     ) -> QueryResult<CP::Scalar> {
+        let owned_table_result = result.to_owned_table(&expr.get_column_result_fields())?;
+
         let (min_row_num, max_row_num) = get_index_range(accessor, expr.get_table_references());
         let range_length = max_row_num - min_row_num;
         let num_sumcheck_variables = cmp::max(log2_up(range_length), 1);
         assert!(num_sumcheck_variables > 0);
-
-        let output_length = result.table_length();
 
         // validate bit decompositions
         for dist in &self.bit_distributions {
@@ -185,12 +189,13 @@ impl<CP: CommitmentEvaluationProof> QueryProof<CP> {
             }
         }
 
+        let column_references = expr.get_column_references();
         // count terms
-        let counts = {
-            let mut builder = CountBuilder::new(&self.bit_distributions);
-            expr.count(&mut builder)?;
-            builder.counts()
-        }?;
+
+        let mut builder = CountBuilder::new(&self.bit_distributions);
+        builder.count_anchored_mles(column_references.len());
+        expr.count(&mut builder)?;
+        let counts = builder.counts()?;
 
         // verify sizes
         if !self.validate_sizes(&counts) {
@@ -248,12 +253,10 @@ impl<CP: CommitmentEvaluationProof> QueryProof<CP> {
                 .take(self.pcs_proof_evaluations.len())
                 .collect();
 
-        let column_result_fields = expr.get_column_result_fields();
-
         // pass over the provable AST to fill in the verification builder
         let sumcheck_evaluations = SumcheckMleEvaluations::new(
             range_length,
-            output_length,
+            owned_table_result.num_rows(),
             &subclaim.evaluation_point,
             &sumcheck_random_scalars,
             &self.pcs_proof_evaluations,
@@ -262,20 +265,28 @@ impl<CP: CommitmentEvaluationProof> QueryProof<CP> {
             min_row_num,
             sumcheck_evaluations,
             &self.bit_distributions,
-            &self.commitments,
             sumcheck_random_scalars.subpolynomial_multipliers,
             &evaluation_random_scalars,
             post_result_challenges,
         );
-        let owned_table_result = result.to_owned_table(&column_result_fields[..])?;
-        let verifier_evaluations =
-            expr.verifier_evaluate(&mut builder, accessor, Some(&owned_table_result))?;
-        // compute the evaluation of the result MLEs
-        let result_evaluations = result.evaluate(
-            &subclaim.evaluation_point,
-            output_length,
-            &column_result_fields[..],
+
+        let pcs_proof_commitments: Vec<_> = column_references
+            .iter()
+            .map(|col| accessor.get_commitment(*col))
+            .chain(self.commitments.iter().cloned())
+            .collect();
+        let evaluation_accessor: IndexMap<_, _> = column_references
+            .into_iter()
+            .map(|col| (col, builder.consume_anchored_mle()))
+            .collect();
+
+        let verifier_evaluations = expr.verifier_evaluate(
+            &mut builder,
+            &evaluation_accessor,
+            Some(&owned_table_result),
         )?;
+        // compute the evaluation of the result MLEs
+        let result_evaluations = owned_table_result.mle_evaluations(&subclaim.evaluation_point);
         // check the evaluation of the result MLEs
         if verifier_evaluations != result_evaluations {
             Err(ProofError::VerificationError {
@@ -295,7 +306,7 @@ impl<CP: CommitmentEvaluationProof> QueryProof<CP> {
         self.evaluation_proof
             .verify_batched_proof(
                 &mut transcript,
-                builder.pcs_proof_commitments(),
+                &pcs_proof_commitments,
                 builder.inner_product_multipliers(),
                 &product,
                 &subclaim.evaluation_point,

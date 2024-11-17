@@ -1,15 +1,13 @@
 use super::{fold_columns, fold_vals};
 use crate::{
     base::{
-        commitment::Commitment,
         database::{
             group_by_util::{
                 aggregate_columns, compare_indexes_by_owned_columns, AggregatedColumns,
             },
-            Column, ColumnField, ColumnRef, ColumnType, CommitmentAccessor, DataAccessor,
-            OwnedTable, TableRef,
+            Column, ColumnField, ColumnRef, ColumnType, DataAccessor, OwnedTable, Table, TableRef,
         },
-        map::IndexSet,
+        map::{IndexMap, IndexSet},
         proof::ProofError,
         scalar::Scalar,
         slice_ops,
@@ -89,12 +87,12 @@ impl ProofPlan for GroupByExec {
     }
 
     #[allow(unused_variables)]
-    fn verifier_evaluate<C: Commitment>(
+    fn verifier_evaluate<S: Scalar>(
         &self,
-        builder: &mut VerificationBuilder<C>,
-        accessor: &dyn CommitmentAccessor<C>,
-        result: Option<&OwnedTable<C::Scalar>>,
-    ) -> Result<Vec<C::Scalar>, ProofError> {
+        builder: &mut VerificationBuilder<S>,
+        accessor: &IndexMap<ColumnRef, S>,
+        result: Option<&OwnedTable<S>>,
+    ) -> Result<Vec<S>, ProofError> {
         // 1. selection
         let where_eval = self.where_clause.verifier_evaluate(builder, accessor)?;
         // 2. columns
@@ -200,14 +198,13 @@ impl ProverEvaluate for GroupByExec {
     #[tracing::instrument(name = "GroupByExec::result_evaluate", level = "debug", skip_all)]
     fn result_evaluate<'a, S: Scalar>(
         &self,
-        input_length: usize,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<S>,
-    ) -> Vec<Column<'a, S>> {
+    ) -> Table<'a, S> {
+        let column_refs = self.get_column_references();
+        let used_table = accessor.get_table(self.table.table_ref, &column_refs);
         // 1. selection
-        let selection_column: Column<'a, S> =
-            self.where_clause
-                .result_evaluate(input_length, alloc, accessor);
+        let selection_column: Column<'a, S> = self.where_clause.result_evaluate(alloc, &used_table);
 
         let selection = selection_column
             .as_boolean()
@@ -217,16 +214,12 @@ impl ProverEvaluate for GroupByExec {
         let group_by_columns = self
             .group_by_exprs
             .iter()
-            .map(|expr| expr.result_evaluate(input_length, alloc, accessor))
+            .map(|expr| expr.result_evaluate(alloc, &used_table))
             .collect::<Vec<_>>();
         let sum_columns = self
             .sum_expr
             .iter()
-            .map(|aliased_expr| {
-                aliased_expr
-                    .expr
-                    .result_evaluate(input_length, alloc, accessor)
-            })
+            .map(|aliased_expr| aliased_expr.expr.result_evaluate(alloc, &used_table))
             .collect::<Vec<_>>();
         // Compute filtered_columns
         let AggregatedColumns {
@@ -237,11 +230,18 @@ impl ProverEvaluate for GroupByExec {
         } = aggregate_columns(alloc, &group_by_columns, &sum_columns, &[], &[], selection)
             .expect("columns should be aggregatable");
         let sum_result_columns_iter = sum_result_columns.iter().map(|col| Column::Scalar(col));
-        group_by_result_columns
-            .into_iter()
-            .chain(sum_result_columns_iter)
-            .chain(iter::once(Column::BigInt(count_column)))
-            .collect::<Vec<_>>()
+        Table::<'a, S>::try_from_iter(
+            self.get_column_result_fields()
+                .into_iter()
+                .map(|field| field.name())
+                .zip(
+                    group_by_result_columns
+                        .into_iter()
+                        .chain(sum_result_columns_iter)
+                        .chain(iter::once(Column::BigInt(count_column))),
+                ),
+        )
+        .expect("Failed to create table from column references")
     }
 
     fn first_round_evaluate(&self, builder: &mut FirstRoundBuilder) {
@@ -255,10 +255,13 @@ impl ProverEvaluate for GroupByExec {
         builder: &mut FinalRoundBuilder<'a, S>,
         alloc: &'a Bump,
         accessor: &'a dyn DataAccessor<S>,
-    ) -> Vec<Column<'a, S>> {
+    ) -> Table<'a, S> {
+        let column_refs = self.get_column_references();
+        let used_table = accessor.get_table(self.table.table_ref, &column_refs);
         // 1. selection
         let selection_column: Column<'a, S> =
-            self.where_clause.prover_evaluate(builder, alloc, accessor);
+            self.where_clause
+                .prover_evaluate(builder, alloc, &used_table);
         let selection = selection_column
             .as_boolean()
             .expect("selection is not boolean");
@@ -267,12 +270,16 @@ impl ProverEvaluate for GroupByExec {
         let group_by_columns = self
             .group_by_exprs
             .iter()
-            .map(|expr| expr.prover_evaluate(builder, alloc, accessor))
+            .map(|expr| expr.prover_evaluate(builder, alloc, &used_table))
             .collect::<Vec<_>>();
         let sum_columns = self
             .sum_expr
             .iter()
-            .map(|aliased_expr| aliased_expr.expr.prover_evaluate(builder, alloc, accessor))
+            .map(|aliased_expr| {
+                aliased_expr
+                    .expr
+                    .prover_evaluate(builder, alloc, &used_table)
+            })
             .collect::<Vec<_>>();
         // 3. Compute filtered_columns
         let AggregatedColumns {
@@ -288,16 +295,22 @@ impl ProverEvaluate for GroupByExec {
 
         // 4. Tally results
         let sum_result_columns_iter = sum_result_columns.iter().map(|col| Column::Scalar(col));
-        let res = group_by_result_columns
+        let columns = group_by_result_columns
             .clone()
             .into_iter()
             .chain(sum_result_columns_iter)
-            .chain(core::iter::once(Column::BigInt(count_column)))
-            .collect::<Vec<_>>();
+            .chain(iter::once(Column::BigInt(count_column)));
+        let res = Table::<'a, S>::try_from_iter(
+            self.get_column_result_fields()
+                .into_iter()
+                .map(|field| field.name())
+                .zip(columns.clone()),
+        )
+        .expect("Failed to create table from column references");
         // 5. Produce MLEs
-        res.iter().copied().for_each(|column| {
+        for column in columns {
             builder.produce_intermediate_mle(column);
-        });
+        }
         // 6. Prove group by
         prove_group_by(
             builder,
@@ -312,12 +325,12 @@ impl ProverEvaluate for GroupByExec {
 }
 
 #[allow(clippy::unnecessary_wraps)]
-fn verify_group_by<C: Commitment>(
-    builder: &mut VerificationBuilder<C>,
-    alpha: C::Scalar,
-    beta: C::Scalar,
-    (g_in_evals, sum_in_evals, sel_in_eval): (Vec<C::Scalar>, Vec<C::Scalar>, C::Scalar),
-    (g_out_evals, sum_out_evals, count_out_eval): (Vec<C::Scalar>, Vec<C::Scalar>, C::Scalar),
+fn verify_group_by<S: Scalar>(
+    builder: &mut VerificationBuilder<S>,
+    alpha: S,
+    beta: S,
+    (g_in_evals, sum_in_evals, sel_in_eval): (Vec<S>, Vec<S>, S),
+    (g_out_evals, sum_out_evals, count_out_eval): (Vec<S>, Vec<S>, S),
 ) -> Result<(), ProofError> {
     let one_eval = builder.mle_evaluations.input_one_evaluation;
 

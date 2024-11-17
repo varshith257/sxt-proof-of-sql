@@ -1,9 +1,8 @@
 use super::{DynProofExpr, ProofExpr};
 use crate::{
     base::{
-        commitment::Commitment,
-        database::{Column, ColumnRef, ColumnType, CommitmentAccessor, DataAccessor},
-        map::IndexSet,
+        database::{Column, ColumnRef, ColumnType, Table},
+        map::{IndexMap, IndexSet},
         proof::ProofError,
         scalar::Scalar,
     },
@@ -38,11 +37,10 @@ impl ProofExpr for NotExpr {
     #[tracing::instrument(name = "NotExpr::result_evaluate", level = "debug", skip_all)]
     fn result_evaluate<'a, S: Scalar>(
         &self,
-        table_length: usize,
         alloc: &'a Bump,
-        accessor: &'a dyn DataAccessor<S>,
+        table: &Table<'a, S>,
     ) -> Column<'a, S> {
-        let expr_column: Column<'a, S> = self.expr.result_evaluate(table_length, alloc, accessor);
+        let expr_column: Column<'a, S> = self.expr.result_evaluate(alloc, table);
         let expr = expr_column.as_boolean().expect("expr is not boolean");
         Column::Boolean(alloc.alloc_slice_fill_with(expr.len(), |i| !expr[i]))
     }
@@ -52,18 +50,18 @@ impl ProofExpr for NotExpr {
         &self,
         builder: &mut FinalRoundBuilder<'a, S>,
         alloc: &'a Bump,
-        accessor: &'a dyn DataAccessor<S>,
+        table: &Table<'a, S>,
     ) -> Column<'a, S> {
-        let expr_column: Column<'a, S> = self.expr.prover_evaluate(builder, alloc, accessor);
+        let expr_column: Column<'a, S> = self.expr.prover_evaluate(builder, alloc, table);
         let expr = expr_column.as_boolean().expect("expr is not boolean");
         Column::Boolean(alloc.alloc_slice_fill_with(expr.len(), |i| !expr[i]))
     }
 
-    fn verifier_evaluate<C: Commitment>(
+    fn verifier_evaluate<S: Scalar>(
         &self,
-        builder: &mut VerificationBuilder<C>,
-        accessor: &dyn CommitmentAccessor<C>,
-    ) -> Result<C::Scalar, ProofError> {
+        builder: &mut VerificationBuilder<S>,
+        accessor: &IndexMap<ColumnRef, S>,
+    ) -> Result<S, ProofError> {
         let eval = self.expr.verifier_evaluate(builder, accessor)?;
         Ok(builder.mle_evaluations.input_one_evaluation - eval)
     }

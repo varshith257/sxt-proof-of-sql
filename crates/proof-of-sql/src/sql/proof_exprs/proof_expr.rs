@@ -1,8 +1,7 @@
 use crate::{
     base::{
-        commitment::Commitment,
-        database::{Column, ColumnRef, ColumnType, CommitmentAccessor, DataAccessor},
-        map::IndexSet,
+        database::{Column, ColumnRef, ColumnType, Table},
+        map::{IndexMap, IndexSet},
         proof::ProofError,
         scalar::Scalar,
     },
@@ -25,9 +24,8 @@ pub trait ProofExpr: Debug + Send + Sync {
     /// Implementations must ensure that the returned slice has length `table_length`.
     fn result_evaluate<'a, S: Scalar>(
         &self,
-        table_length: usize,
         alloc: &'a Bump,
-        accessor: &'a dyn DataAccessor<S>,
+        table: &Table<'a, S>,
     ) -> Column<'a, S>;
 
     /// Evaluate the expression, add components needed to prove it, and return thet resulting column
@@ -36,17 +34,17 @@ pub trait ProofExpr: Debug + Send + Sync {
         &self,
         builder: &mut FinalRoundBuilder<'a, S>,
         alloc: &'a Bump,
-        accessor: &'a dyn DataAccessor<S>,
+        table: &Table<'a, S>,
     ) -> Column<'a, S>;
 
     /// Compute the evaluation of a multilinear extension from this expression
     /// at the random sumcheck point and adds components needed to verify the expression to
-    /// [`VerificationBuilder<C>`]
-    fn verifier_evaluate<C: Commitment>(
+    /// [`VerificationBuilder<S>`]
+    fn verifier_evaluate<S: Scalar>(
         &self,
-        builder: &mut VerificationBuilder<C>,
-        accessor: &dyn CommitmentAccessor<C>,
-    ) -> Result<C::Scalar, ProofError>;
+        builder: &mut VerificationBuilder<S>,
+        accessor: &IndexMap<ColumnRef, S>,
+    ) -> Result<S, ProofError>;
 
     /// Insert in the [`IndexSet`] `columns` all the column
     /// references in the `BoolExpr` or forwards the call to some

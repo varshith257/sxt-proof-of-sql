@@ -9,15 +9,15 @@ use crate::base::{
         BigDecimalExt,
     },
 };
-use alloc::{boxed::Box, string::ToString, vec::Vec};
+use alloc::{boxed::Box, format, string::ToString, vec::Vec};
 use proof_of_sql_parser::{
     intermediate_ast::{
-        AggregationOperator, AliasedResultExpr, BinaryOperator, Expression, Literal, OrderBy,
-        SelectResultExpr, Slice, TableExpression, UnaryOperator,
+        AggregationOperator, AliasedResultExpr, Expression, Literal, OrderBy, SelectResultExpr,
+        Slice, TableExpression,
     },
     Identifier, ResourceId,
 };
-
+use sqlparser::ast::{BinaryOperator, UnaryOperator};
 pub struct QueryContextBuilder<'a> {
     context: QueryContext,
     schema_accessor: &'a dyn SchemaAccessor,
@@ -137,8 +137,10 @@ impl<'a> QueryContextBuilder<'a> {
             Expression::Wildcard => Ok(ColumnType::BigInt), // Since COUNT(*) = COUNT(1)
             Expression::Literal(literal) => self.visit_literal(literal),
             Expression::Column(_) => self.visit_column_expr(expr),
-            Expression::Unary { op, expr } => self.visit_unary_expr(*op, expr),
-            Expression::Binary { op, left, right } => self.visit_binary_expr(*op, left, right),
+            Expression::Unary { op, expr } => self.visit_unary_expr((*op).into(), expr),
+            Expression::Binary { op, left, right } => {
+                self.visit_binary_expr(&(*op).into(), left, right)
+            }
             Expression::Aggregation { op, expr } => self.visit_agg_expr(*op, expr),
         }
     }
@@ -156,7 +158,7 @@ impl<'a> QueryContextBuilder<'a> {
 
     fn visit_binary_expr(
         &mut self,
-        op: BinaryOperator,
+        op: &BinaryOperator,
         left: &Expression,
         right: &Expression,
     ) -> ConversionResult<ColumnType> {
@@ -166,13 +168,19 @@ impl<'a> QueryContextBuilder<'a> {
         match op {
             BinaryOperator::And
             | BinaryOperator::Or
-            | BinaryOperator::Equal
-            | BinaryOperator::GreaterThanOrEqual
-            | BinaryOperator::LessThanOrEqual => Ok(ColumnType::Boolean),
+            | BinaryOperator::Eq
+            | BinaryOperator::GtEq
+            | BinaryOperator::LtEq => Ok(ColumnType::Boolean),
             BinaryOperator::Multiply
-            | BinaryOperator::Division
-            | BinaryOperator::Subtract
-            | BinaryOperator::Add => Ok(left_dtype),
+            | BinaryOperator::Divide
+            | BinaryOperator::Minus
+            | BinaryOperator::Plus => Ok(left_dtype),
+            _ => {
+                // Handle unsupported binary operations
+                Err(ConversionError::UnsupportedOperation {
+                    message: format!("{op:?}"),
+                })
+            }
         }
     }
 
@@ -192,6 +200,10 @@ impl<'a> QueryContextBuilder<'a> {
                 }
                 Ok(ColumnType::Boolean)
             }
+            // Handle unsupported operators
+            _ => Err(ConversionError::UnsupportedOperation {
+                message: format!("{op:?}"),
+            }),
         }
     }
 
@@ -264,7 +276,7 @@ impl<'a> QueryContextBuilder<'a> {
 pub(crate) fn type_check_binary_operation(
     left_dtype: &ColumnType,
     right_dtype: &ColumnType,
-    binary_operator: BinaryOperator,
+    binary_operator: &BinaryOperator,
 ) -> bool {
     match binary_operator {
         BinaryOperator::And | BinaryOperator::Or => {
@@ -273,7 +285,7 @@ pub(crate) fn type_check_binary_operation(
                 (ColumnType::Boolean, ColumnType::Boolean)
             )
         }
-        BinaryOperator::Equal => {
+        BinaryOperator::Eq => {
             matches!(
                 (left_dtype, right_dtype),
                 (ColumnType::VarChar, ColumnType::VarChar)
@@ -283,7 +295,7 @@ pub(crate) fn type_check_binary_operation(
                     | (ColumnType::Scalar, _)
             ) || (left_dtype.is_numeric() && right_dtype.is_numeric())
         }
-        BinaryOperator::GreaterThanOrEqual | BinaryOperator::LessThanOrEqual => {
+        BinaryOperator::GtEq | BinaryOperator::LtEq => {
             if left_dtype == &ColumnType::VarChar || right_dtype == &ColumnType::VarChar {
                 return false;
             }
@@ -305,22 +317,22 @@ pub(crate) fn type_check_binary_operation(
                         | (ColumnType::TimestampTZ(_, _), ColumnType::TimestampTZ(_, _))
                 )
         }
-        BinaryOperator::Add => {
-            try_add_subtract_column_types(*left_dtype, *right_dtype, BinaryOperator::Add).is_ok()
-        }
-        BinaryOperator::Subtract => {
-            try_add_subtract_column_types(*left_dtype, *right_dtype, BinaryOperator::Subtract)
-                .is_ok()
+        BinaryOperator::Plus | BinaryOperator::Minus => {
+            try_add_subtract_column_types(*left_dtype, *right_dtype).is_ok()
         }
         BinaryOperator::Multiply => try_multiply_column_types(*left_dtype, *right_dtype).is_ok(),
-        BinaryOperator::Division => left_dtype.is_numeric() && right_dtype.is_numeric(),
+        BinaryOperator::Divide => left_dtype.is_numeric() && right_dtype.is_numeric(),
+        _ => {
+            // Handle unsupported binary operations
+            false
+        }
     }
 }
 
 fn check_dtypes(
     left_dtype: ColumnType,
     right_dtype: ColumnType,
-    binary_operator: BinaryOperator,
+    binary_operator: &BinaryOperator,
 ) -> ConversionResult<()> {
     if type_check_binary_operation(&left_dtype, &right_dtype, binary_operator) {
         Ok(())

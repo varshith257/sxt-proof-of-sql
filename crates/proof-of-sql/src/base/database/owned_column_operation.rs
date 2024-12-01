@@ -17,7 +17,7 @@ use crate::base::{
     scalar::Scalar,
 };
 use core::ops::{Add, Div, Mul, Sub};
-use proof_of_sql_parser::intermediate_ast::{BinaryOperator, UnaryOperator};
+use proof_of_sql_parser::intermediate_ast::{BinaryOperator, UnaryOperator as PoSqlUnaryOperator};
 
 impl<S: Scalar> OwnedColumn<S> {
     /// Element-wise NOT operation for a column
@@ -25,7 +25,7 @@ impl<S: Scalar> OwnedColumn<S> {
         match self {
             Self::Boolean(values) => Ok(Self::Boolean(slice_not(values))),
             _ => Err(ColumnOperationError::UnaryOperationInvalidColumnType {
-                operator: UnaryOperator::Not,
+                operator: PoSqlUnaryOperator::Not,
                 operand_type: self.column_type(),
             }),
         }

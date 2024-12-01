@@ -139,6 +139,13 @@ pub enum ConversionError {
         /// The underlying error
         error: String,
     },
+
+    #[snafu(display("Unsupported unary operator: {op}"))]
+    /// Unsupported unary operation
+    UnsupportedUnaryOperator {
+        /// The unary operator that is unsupported
+        op: String,
+    },
 }
 
 impl From<String> for ConversionError {

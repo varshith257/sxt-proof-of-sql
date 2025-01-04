@@ -5,6 +5,7 @@ use crate::{
         OrderBy as PoSqlOrderBy, OrderByDirection, SelectResultExpr, SetExpression,
         TableExpression, UnaryOperator as PoSqlUnaryOperator,
     },
+    posql_time::{PoSQLTimeZone, PoSQLTimestamp},
     Identifier, ResourceId, SelectStatement,
 };
 use alloc::{boxed::Box, string::ToString, vec};
@@ -26,6 +27,50 @@ where
 /// Convert an [`Identifier`] into a [`Expr`].
 fn id(id: Identifier) -> Expr {
     Expr::Identifier(id.into())
+}
+
+/// Provides an extension for the `TimezoneInfo` type for offsets.
+pub trait TimezoneInfoExt {
+    /// Retrieve the offset in seconds for `TimezoneInfo`.
+    fn offset(&self, timezone_str: Option<&str>) -> i32;
+}
+
+impl TimezoneInfoExt for TimezoneInfo {
+    fn offset(&self, timezone_str: Option<&str>) -> i32 {
+        match self {
+            TimezoneInfo::None => PoSQLTimeZone::utc().offset(),
+            TimezoneInfo::WithTimeZone => match timezone_str {
+                Some(tz_str) => PoSQLTimeZone::try_from(&Some(tz_str.into()))
+                    .unwrap_or_else(|_| PoSQLTimeZone::utc())
+                    .offset(),
+                None => PoSQLTimeZone::utc().offset(),
+            },
+            _ => panic!("Offsets are not applicable for WithoutTimeZone or Tz variants."),
+        }
+    }
+}
+
+/// Convert a timestamp string into an [`Expr`].
+impl From<&PoSQLTimestamp> for Expr {
+    fn from(timestamp: &PoSQLTimestamp) -> Self {
+        Expr::TypedString {
+            data_type: DataType::Timestamp(
+                Some(timestamp.timeunit().into()),
+                timestamp.timezone().into(),
+            ),
+            value: timestamp.timestamp().to_string(),
+        }
+    }
+}
+
+/// Parses [`PoSQLTimeZone`] into a `TimezoneInfo`.
+impl From<PoSQLTimeZone> for TimezoneInfo {
+    fn from(posql_timezone: PoSQLTimeZone) -> Self {
+        match posql_timezone.offset() {
+            0 => TimezoneInfo::None,
+            _ => TimezoneInfo::WithTimeZone,
+        }
+    }
 }
 
 impl From<Identifier> for Ident {
@@ -267,6 +312,11 @@ mod test {
         check_posql_intermediate_ast_to_sqlparser_equivalence(
             "select timestamp '2024-11-07T04:55:12.345+03:00' as time from t;",
             "select timestamp(3) '2024-11-07 01:55:12.345 UTC' as time from t;",
+        );
+
+        check_posql_intermediate_ast_to_sqlparser_equivalence(
+            "select timestamp '2024-11-07T04:55:12+00:00' as time from t;",
+            "select timestamp(0) '2024-11-07 04:55:12 UTC' as time from t;",
         );
     }
 

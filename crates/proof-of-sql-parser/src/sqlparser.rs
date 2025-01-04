@@ -5,10 +5,14 @@ use crate::{
         OrderBy as PoSqlOrderBy, OrderByDirection, SelectResultExpr, SetExpression,
         TableExpression, UnaryOperator as PoSqlUnaryOperator,
     },
-    posql_time::{PoSQLTimeZone, PoSQLTimestamp},
+    posql_time::{PoSQLTimeUnit, PoSQLTimeZone},
     Identifier, ResourceId, SelectStatement,
 };
-use alloc::{boxed::Box, string::ToString, vec};
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec,
+};
 use core::fmt::Display;
 use sqlparser::ast::{
     BinaryOperator, DataType, Expr, Function, FunctionArg, FunctionArgExpr, GroupByExpr, Ident,
@@ -50,17 +54,18 @@ impl TimezoneInfoExt for TimezoneInfo {
     }
 }
 
-/// Convert a timestamp string into an [`Expr`].
-impl From<&PoSQLTimestamp> for Expr {
-    fn from(timestamp: &PoSQLTimestamp) -> Self {
-        Expr::TypedString {
-            data_type: DataType::Timestamp(
-                Some(timestamp.timeunit().into()),
-                timestamp.timezone().into(),
-            ),
-            value: timestamp.timestamp().to_string(),
-        }
-    }
+/// Utility function to create a `Timestamp` expression.
+pub fn timestamp_to_expr(
+    value: &str,
+    time_unit: PoSQLTimeUnit,
+    timezone: TimezoneInfo,
+) -> Result<Expr, String> {
+    let time_unit_as_u64 = u64::from(time_unit);
+
+    Ok(Expr::TypedString {
+        data_type: DataType::Timestamp(Some(time_unit_as_u64), timezone),
+        value: value.to_string(),
+    })
 }
 
 /// Parses [`PoSQLTimeZone`] into a `TimezoneInfo`.

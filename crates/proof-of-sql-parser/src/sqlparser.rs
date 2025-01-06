@@ -1,21 +1,17 @@
 //! This module exists to adapt the current parser to `sqlparser`.
 use crate::{
     intermediate_ast::{
-        AliasedResultExpr, BinaryOperator as PoSqlBinaryOperator, Expression, Literal,
-        OrderBy as PoSqlOrderBy, OrderByDirection, SelectResultExpr, SetExpression,
+        AggregationOperator, AliasedResultExpr, BinaryOperator as PoSqlBinaryOperator, Expression,
+        Literal, OrderBy as PoSqlOrderBy, OrderByDirection, SelectResultExpr, SetExpression,
         TableExpression, UnaryOperator as PoSqlUnaryOperator,
     },
-    posql_time::{PoSQLTimeUnit, PoSQLTimeZone},
     posql_time::{PoSQLTimeUnit, PoSQLTimeZone},
     Identifier, ResourceId, SelectStatement,
 };
 use alloc::{
     boxed::Box,
-    string::{String, ToString},
-    vec,
-};
-use alloc::{
-    boxed::Box,
+    format,
+    str::FromStr,
     string::{String, ToString},
     vec,
 };
@@ -286,6 +282,21 @@ impl From<SelectStatement> for Query {
             fetch: None,
             locks: vec![],
             for_clause: None,
+        }
+    }
+}
+
+impl FromStr for AggregationOperator {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "max" => Ok(AggregationOperator::Max),
+            "min" => Ok(AggregationOperator::Min),
+            "sum" => Ok(AggregationOperator::Sum),
+            "count" => Ok(AggregationOperator::Count),
+            "first" => Ok(AggregationOperator::First),
+            _ => Err(format!("Unknown aggregation operator: {s}")),
         }
     }
 }

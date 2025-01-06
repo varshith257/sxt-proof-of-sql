@@ -1,41 +1,36 @@
 use crate::base::{
     database::{
-        owned_table_utility::*, ColumnOperationError, ExpressionEvaluationError, OwnedColumn,
-        OwnedTable,
+        expr_util::*, owned_table_utility::*, ColumnOperationError, ExpressionEvaluationError,
+        OwnedColumn, OwnedTable,
     },
     math::decimal::Precision,
     scalar::test_scalar::TestScalar,
 };
-use bigdecimal::BigDecimal;
-use proof_of_sql_parser::{
-    intermediate_ast::Literal,
-    posql_time::{PoSQLTimeUnit, PoSQLTimestamp},
-    utility::*,
-};
-use sqlparser::ast::TimezoneInfo;
-
+use proof_of_sql_parser::posql_time::PoSQLTimeUnit;
+use sqlparser::ast::{DataType, ExactNumberInfo, Expr, TimezoneInfo, Value};
 #[test]
 fn we_can_evaluate_a_simple_literal() {
     let table: OwnedTable<TestScalar> =
         owned_table([varchar("languages", ["en", "es", "pt", "fr", "ht"])]);
 
     // "Space and Time" in Hebrew
-    let expr = lit("מרחב וזמן".to_string());
+    let expr = Expr::Value(Value::SingleQuotedString("מרחב וזמן".to_string()));
     let actual_column = table.evaluate(&expr).unwrap();
     let expected_column = OwnedColumn::VarChar(vec!["מרחב וזמן".to_string(); 5]);
     assert_eq!(actual_column, expected_column);
 
     // Is Proof of SQL in production?
-    let expr = lit(true);
+    let expr = Expr::Value(Value::Boolean(true));
     let actual_column = table.evaluate(&expr).unwrap();
     let expected_column = OwnedColumn::Boolean(vec![true; 5]);
     assert_eq!(actual_column, expected_column);
 
     // When was Space and Time founded?
     let timestamp = "2022-03-01T00:00:00Z";
-    let expr = lit(Literal::Timestamp(
-        PoSQLTimestamp::try_from(timestamp).unwrap(),
-    ));
+    let expr = Expr::TypedString {
+        data_type: DataType::Timestamp(Some(0), TimezoneInfo::None),
+        value: timestamp.to_string(),
+    };
     let actual_column = table.evaluate(&expr).unwrap();
     // UNIX timestamp for 2022-03-01T00:00:00Z
     let actual_timestamp = 1_646_092_800;
@@ -47,9 +42,27 @@ fn we_can_evaluate_a_simple_literal() {
     assert_eq!(actual_column, expected_column);
 
     // A group of people has about 0.67 cats per person
-    let expr = lit("0.67".parse::<BigDecimal>().unwrap());
+    // let value = "0.67"
+    //     .parse::<BigDecimal>()
+    //     .map_err(|_| DecimalError::InvalidDecimal {
+    //         error: "Invalid BigDecimal format: 0.67".to_string(),
+    //     });
+    let precision = 2_u64;
+    let scale = 2_i8;
+    let value = "0.67".to_string();
+    let expr = Expr::TypedString {
+        data_type: DataType::Decimal(ExactNumberInfo::PrecisionAndScale(
+            precision,
+            scale.try_into().unwrap(),
+        )),
+        value,
+    };
     let actual_column = table.evaluate(&expr).unwrap();
-    let expected_column = OwnedColumn::Decimal75(Precision::new(2).unwrap(), 2, vec![67.into(); 5]);
+    let expected_column = OwnedColumn::Decimal75(
+        Precision::new(precision.try_into().unwrap()).unwrap(),
+        scale,
+        vec![67.into(); 5],
+    );
     assert_eq!(actual_column, expected_column);
 }
 
@@ -152,7 +165,10 @@ fn we_can_evaluate_an_arithmetic_expression() {
     ]);
 
     // Subtract 1 from the bigints
-    let expr = sub(col("bigints"), lit(1));
+    let expr = sub(
+        col("bigints"),
+        Expr::Value(Value::Number("1".to_string(), false)),
+    );
     let actual_column = table.evaluate(&expr).unwrap();
     let expected_column = OwnedColumn::BigInt(vec![-9, -5, -1, 3, 7]);
     assert_eq!(actual_column, expected_column);
@@ -166,7 +182,13 @@ fn we_can_evaluate_an_arithmetic_expression() {
     // Multiply decimals with 0.75 and add smallints to the product
     let expr = add(
         col("smallints"),
-        mul(col("decimals"), lit("0.75".parse::<BigDecimal>().unwrap())),
+        mul(
+            col("decimals"),
+            Expr::TypedString {
+                data_type: DataType::Decimal(ExactNumberInfo::PrecisionAndScale(3, 2)),
+                value: "0.75".to_string(),
+            },
+        ),
     );
     let actual_column = table.evaluate(&expr).unwrap();
     let expected_scalars = [-2000, -925, 150, 1225, 2300]
@@ -178,7 +200,13 @@ fn we_can_evaluate_an_arithmetic_expression() {
 
     // Decimals over 2.5 plus int128s
     let expr = add(
-        div(col("decimals"), lit("2.5".parse::<BigDecimal>().unwrap())),
+        div(
+            col("decimals"),
+            Expr::TypedString {
+                data_type: DataType::Decimal(ExactNumberInfo::PrecisionAndScale(2, 1)), // Precision 2, scale 1
+                value: "2.5".to_string(),
+            },
+        ),
         col("int128s"),
     );
     let actual_column = table.evaluate(&expr).unwrap();
@@ -226,7 +254,10 @@ fn we_cannot_evaluate_expressions_if_column_operation_errors_out() {
     ));
 
     // i64::MIN - 1 overflows
-    let expr = sub(col("bigints"), lit(1));
+    let expr = sub(
+        col("bigints"),
+        Expr::Value(Value::Number("1".to_string(), false)),
+    );
     assert!(matches!(
         table.evaluate(&expr),
         Err(ExpressionEvaluationError::ColumnOperationError {
@@ -235,7 +266,10 @@ fn we_cannot_evaluate_expressions_if_column_operation_errors_out() {
     ));
 
     // We can't divide by zero
-    let expr = div(col("bigints"), lit(0));
+    let expr = div(
+        col("bigints"),
+        Expr::Value(Value::Number("0".to_string(), false)),
+    );
     assert!(matches!(
         table.evaluate(&expr),
         Err(ExpressionEvaluationError::ColumnOperationError {

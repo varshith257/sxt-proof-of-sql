@@ -9,15 +9,20 @@ use crate::base::{
         BigDecimalExt,
     },
 };
+use crate::base::database::ExpressionEvaluationError;
+use proof_of_sql_parser::posql_time::PoSQLTimeUnit;
 use alloc::{boxed::Box, format, string::ToString, vec::Vec};
 use proof_of_sql_parser::{
     intermediate_ast::{
-        AggregationOperator, AliasedResultExpr, Expression, Literal, OrderBy, SelectResultExpr,
-        Slice, TableExpression,
+        AggregationOperator, AliasedResultExpr, Literal, OrderBy, SelectResultExpr, Slice,
+        TableExpression,
     },
     Identifier, ResourceId,
 };
-use sqlparser::ast::{BinaryOperator, UnaryOperator};
+use sqlparser::ast::{BinaryOperator, Expr, Value, UnaryOperator};
+use crate::base::math::decimal::try_convert_intermediate_decimal_to_scalar;
+use sqlparser::ast::DataType;
+use bigdecimal::BigDecimal;
 pub struct QueryContextBuilder<'a> {
     context: QueryContext,
     schema_accessor: &'a dyn SchemaAccessor,
@@ -50,10 +55,7 @@ impl<'a> QueryContextBuilder<'a> {
         self
     }
 
-    pub fn visit_where_expr(
-        mut self,
-        mut where_expr: Option<Box<Expression>>,
-    ) -> ConversionResult<Self> {
+    pub fn visit_where_expr(mut self, mut where_expr: Option<Box<Expr>>) -> ConversionResult<Self> {
         if let Some(expr) = where_expr.as_deref_mut() {
             self.visit_expr(expr)?;
         }
@@ -121,7 +123,7 @@ impl<'a> QueryContextBuilder<'a> {
                     error: format!("Failed to convert Ident to Identifier: {e}"),
                 }
             })?;
-            let col_expr = Expression::Column(column_identifier);
+            let col_expr = Expr::Identifier(column_identifier.clone().into());
             self.visit_aliased_expr(AliasedResultExpr::new(col_expr, column_identifier))?;
         }
         Ok(())
@@ -134,39 +136,46 @@ impl<'a> QueryContextBuilder<'a> {
     }
 
     /// Visits the expression and returns its data type.
-    fn visit_expr(&mut self, expr: &Expression) -> ConversionResult<ColumnType> {
+    fn visit_expr(&mut self, expr: &Expr) -> ConversionResult<ColumnType> {
         match expr {
-            Expression::Wildcard => Ok(ColumnType::BigInt), // Since COUNT(*) = COUNT(1)
-            Expression::Literal(literal) => self.visit_literal(literal),
-            Expression::Column(_) => self.visit_column_expr(expr),
-            Expression::Unary { op, expr } => self.visit_unary_expr((*op).into(), expr),
-            Expression::Binary { op, left, right } => {
+            Expr::Wildcard => Ok(ColumnType::BigInt), // Since COUNT(*) = COUNT(1)
+            Expr::Value(value) => self.visit_literal(value),
+            Expr::Identifier(_) => self.visit_column_expr(expr),
+            Expr::UnaryOp { op, expr } => self.visit_unary_expr((*op).into(), expr),
+            Expr::BinaryOp { op, left, right } => {
                 self.visit_binary_expr(&(*op).into(), left, right)
             }
-            Expression::Aggregation { op, expr } => self.visit_agg_expr(*op, expr),
+            Expr::AggregateExpressionWithFilter { expr, filter } => {
+                self.visit_aggregate_with_filter(expr, filter)
+            }
+            _ => Err(ConversionError::UnsupportedExpression {
+                expr: format!("Expression {expr:?} is not supported yet"),
+            }),
         }
     }
 
     /// # Panics
     /// Panics if the expression is not a column expression.
-    fn visit_column_expr(&mut self, expr: &Expression) -> ConversionResult<ColumnType> {
+    fn visit_column_expr(&mut self, expr: &Expr) -> ConversionResult<ColumnType> {
         let identifier = match expr {
-            Expression::Column(identifier) => *identifier,
+            Expr::Identifier(identifier) => identifier,
             _ => panic!("Must be a column expression"),
         };
 
-        self.visit_column_identifier(&identifier.into())
+        self.visit_column_identifier(&identifier)
     }
 
     fn visit_binary_expr(
         &mut self,
         op: &BinaryOperator,
-        left: &Expression,
-        right: &Expression,
+        left: &Expr,
+        right: &Expr,
     ) -> ConversionResult<ColumnType> {
         let left_dtype = self.visit_expr(left)?;
         let right_dtype = self.visit_expr(right)?;
+
         check_dtypes(left_dtype, right_dtype, op)?;
+
         match op {
             BinaryOperator::And
             | BinaryOperator::Or
@@ -177,6 +186,7 @@ impl<'a> QueryContextBuilder<'a> {
             | BinaryOperator::Divide
             | BinaryOperator::Minus
             | BinaryOperator::Plus => Ok(left_dtype),
+
             _ => {
                 // Handle unsupported binary operations
                 Err(ConversionError::UnsupportedOperation {
@@ -186,14 +196,11 @@ impl<'a> QueryContextBuilder<'a> {
         }
     }
 
-    fn visit_unary_expr(
-        &mut self,
-        op: UnaryOperator,
-        expr: &Expression,
-    ) -> ConversionResult<ColumnType> {
+    fn visit_unary_expr(&mut self, op: UnaryOperator, expr: &Expr) -> ConversionResult<ColumnType> {
         match op {
             UnaryOperator::Not => {
                 let dtype = self.visit_expr(expr)?;
+
                 if dtype != ColumnType::Boolean {
                     return Err(ConversionError::InvalidDataType {
                         expected: ColumnType::Boolean,
@@ -212,7 +219,7 @@ impl<'a> QueryContextBuilder<'a> {
     fn visit_agg_expr(
         &mut self,
         op: AggregationOperator,
-        expr: &Expression,
+        expr: &Expr,
     ) -> ConversionResult<ColumnType> {
         self.context.set_in_agg_scope(true)?;
 
@@ -237,27 +244,58 @@ impl<'a> QueryContextBuilder<'a> {
     }
 
     #[allow(clippy::unused_self)]
-    fn visit_literal(&self, literal: &Literal) -> Result<ColumnType, ConversionError> {
-        match literal {
-            Literal::Boolean(_) => Ok(ColumnType::Boolean),
-            Literal::BigInt(_) => Ok(ColumnType::BigInt),
-            Literal::Int128(_) => Ok(ColumnType::Int128),
-            Literal::VarChar(_) => Ok(ColumnType::VarChar),
-            Literal::Decimal(d) => {
-                let precision = Precision::try_from(d.precision())?;
-                let scale = d.scale();
-                Ok(ColumnType::Decimal75(
-                    precision,
-                    scale.try_into().map_err(|_| DecimalError::InvalidScale {
-                        scale: scale.to_string(),
-                    })?,
-                ))
-            }
+    fn visit_literal(&self, expr: &Expr) -> Result<ColumnType, ConversionError> {
+        match expr {
+            Expr::Value(Value::Boolean(_)) => Ok(ColumnType::Boolean),
+            Expr::Value(Value::Number(n, _)) => n
+                .parse::<i128>()
+                .map_err(|_| ConversionError::InvalidNumberFormat { value: n.clone() })
+                .and_then(|n| {
+                    if n <= i64::MAX as i128 {
+                        Ok(ColumnType::BigInt)
+                    } else {
+                        Ok(ColumnType::Int128)
+                    }
+                }),
+            Expr::Value(Value::SingleQuotedString(_)) => Ok(ColumnType::VarChar),
+            Expr::TypedString { data_type, value } => match data_type {
+                DataType::Decimal(ExactNumberInfo::PrecisionAndScale(precision, scale)) => {
+                    let decimal = BigDecimal::parse_bytes(value.as_bytes(), 10).unwrap();
+                    let scalar = try_convert_intermediate_decimal_to_scalar(
+                        &decimal,
+                        Precision::try_from(*precision as u64)?,
+                        *scale as i8,
+                    )?;
+                    Ok(ColumnType::Decimal75(
+                        Precision::try_from(*precision as u64)?,
+                        *scale as i8,
+                    ))
+                }
 
-            Literal::Timestamp(its) => Ok(ColumnType::TimestampTZ(
-                its.timeunit(),
-                its.timezone().into(),
-            )),
+                DataType::Timestamp(Some(tu), tz) => {
+                    let time_unit = PoSQLTimeUnit::try_from(*time_unit).map_err(|err| {
+                        DecimalError::InvalidDecimal {
+                            error: format!("Invalid time unit precision: {err}"),
+                        }
+                    })?;
+
+                    let timezone_info = time_zone.clone();
+
+                    let timestamp_value =
+                        value
+                            .parse::<i64>()
+                            .map_err(|_| DecimalError::InvalidDecimal {
+                                error: format!("Invalid timestamp value: {value}"),
+                            })?;
+                    Ok(ColumnType::TimestampTZ(time_unit, *time_zone))
+                }
+                _ => Err(ExpressionEvaluationError::Unsupported {
+                    expression: "Unsupported TypedString data type".to_string(),
+                }),
+            },
+            _ => Err(ExpressionEvaluationError::Unsupported {
+                expression: "Unsupported expression type".to_string(),
+            }),
         }
     }
 

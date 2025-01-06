@@ -59,6 +59,17 @@ pub enum PostprocessingError {
         /// The nested aggregation error
         error: String,
     },
+
+    /// Unsupported expression
+    #[snafu(display("Unsupported expression encountered: {expr}"))]
+    UnsupportedExpression {
+        /// The unsupported expression
+        expr: String,
+    },
+
+    /// Unsupported Aggregation Operator
+    #[snafu(display("Invalid aggregation argument: {argument}"))]
+    InvalidAggregationArgument { argument: String },
 }
 
 /// Result type for postprocessing

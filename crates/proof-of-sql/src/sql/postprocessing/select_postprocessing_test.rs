@@ -2,10 +2,11 @@ use crate::{
     base::{
         database::{owned_table_utility::*, OwnedTable},
         scalar::Curve25519Scalar,
+        expr_utils::*
     },
     sql::postprocessing::{apply_postprocessing_steps, test_utility::*, OwnedTablePostprocessing},
 };
-use proof_of_sql_parser::utility::*;
+// use proof_of_sql_parser::utility::*;
 
 #[test]
 fn we_can_filter_out_owned_table_columns() {

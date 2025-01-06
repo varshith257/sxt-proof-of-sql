@@ -1,12 +1,38 @@
 use alloc::{boxed::Box, vec, vec::Vec};
 use proof_of_sql_parser::{
     intermediate_ast::{
-        AggregationOperator, AliasedResultExpr, Expression, Literal, OrderBy, OrderByDirection,
-        SelectResultExpr, SetExpression, Slice, TableExpression,
+        AggregationOperator, Expression, OrderBy, OrderByDirection, SelectResultExpr,
+        SetExpression, Slice, TableExpression,
     },
     Identifier, SelectStatement,
 };
-use sqlparser::ast::{BinaryOperator, Expr, UnaryOperator};
+use serde::{Deserialize, Serialize};
+use sqlparser::ast::{BinaryOperator, Expr, Ident, UnaryOperator, Value};
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+/// Represents an expression with an alias, e.g., `a + 1 AS b`
+pub struct AliasedResultExpr {
+    /// The underlying expression
+    pub expr: Expr,
+    /// The alias for the expression
+    pub alias: Ident,
+}
+
+impl AliasedResultExpr {
+    /// Create a new `AliasedResultExpr`
+    pub fn new(expr: Expr, alias: Ident) -> Self {
+        Self { expr, alias }
+    }
+
+    /// Extract the identifier from the expression if it is a column
+    pub fn try_as_identifier(&self) -> Option<&Ident> {
+        if let Expr::Identifier(ref ident) = self.expr {
+            Some(ident)
+        } else {
+            None
+        }
+    }
+}
 
 ///
 /// # Panics
@@ -17,6 +43,13 @@ use sqlparser::ast::{BinaryOperator, Expr, UnaryOperator};
 pub fn ident(name: &str) -> Identifier {
     name.parse().unwrap()
 }
+
+// fn new_aliased_expr(expr: Expr, alias: &str) -> Expr {
+//     Expr::Alias {
+//         expr: Box::new(expr),
+//         alias: Ident::new(alias),
+//     }
+// }
 
 /// Construct a new boxed `Expression` A == B
 #[must_use]
@@ -137,13 +170,13 @@ pub fn tab(schema: Option<&str>, name: &str) -> Box<TableExpression> {
 ///
 /// This function will panic if the `name` cannot be parsed into a valid column expression as valid [Identifier]s.
 #[must_use]
-pub fn col(name: &str) -> Box<Expression> {
-    Box::new(Expression::Column(name.parse().unwrap()))
+pub fn col(name: &str) -> Expr {
+    Expr::Identifier(Ident::new(name))
 }
 
 /// Get literal from value
-pub fn lit<L: Into<Literal>>(literal: L) -> Box<Expression> {
-    Box::new(Expression::Literal(literal.into()))
+pub fn lit<L: Into<Value>>(literal: L) -> Expr {
+    Expr::Value(literal.into())
 }
 
 /// Compute the sum of an expression
@@ -194,10 +227,10 @@ pub fn count_all() -> Box<Expression> {
 ///
 /// This function will panic if the `alias` cannot be parsed as valid [Identifier]s.
 #[must_use]
-pub fn aliased_expr(expr: Box<Expression>, alias: &str) -> AliasedResultExpr {
+pub fn aliased_expr(expr: Box<Expr>, alias: &str) -> AliasedResultExpr {
     AliasedResultExpr {
-        expr,
-        alias: alias.parse().unwrap(),
+        expr: *expr,
+        alias: alias.into(),
     }
 }
 
@@ -207,93 +240,93 @@ pub fn col_res_all() -> SelectResultExpr {
     SelectResultExpr::ALL
 }
 
-/// Select one column from a table and give it an alias i.e. SELECT COL AS ALIAS
-///
-/// # Panics
-///
-/// This function will panic if the `alias` cannot be parsed as valid [Identifier]s.
-#[must_use]
-pub fn col_res(col_val: Box<Expression>, alias: &str) -> SelectResultExpr {
-    SelectResultExpr::AliasedResultExpr(AliasedResultExpr {
-        expr: col_val,
-        alias: alias.parse().unwrap(),
-    })
-}
+// /// Select one column from a table and give it an alias i.e. SELECT COL AS ALIAS
+// ///
+// /// # Panics
+// ///
+// /// This function will panic if the `alias` cannot be parsed as valid [Identifier]s.
+// #[must_use]
+// pub fn col_res(col_val: Box<Expr>, alias: &str) -> SelectResultExpr {
+//     SelectResultExpr::AliasedResultExpr(AliasedResultExpr {
+//         expr: *col_val,
+//         alias: alias.into(),
+//     })
+// }
 
-/// Select multiple columns from a table i.e. SELECT COL1, COL2, ...
-#[must_use]
-pub fn cols_res(names: &[&str]) -> Vec<SelectResultExpr> {
-    names.iter().map(|name| col_res(col(name), name)).collect()
-}
+// /// Select multiple columns from a table i.e. SELECT COL1, COL2, ...
+// #[must_use]
+// pub fn cols_res(names: &[&str]) -> Vec<SelectResultExpr> {
+//     names.iter().map(|name| col_res(col(name), name)).collect()
+// }
 
 /// Compute the minimum of an expression and give it an alias i.e. SELECT MIN(EXPR) AS ALIAS
 ///
 /// # Panics
 ///
 /// This function will panic if the `alias` cannot be parsed.
-#[must_use]
-pub fn min_res(expr: Box<Expression>, alias: &str) -> SelectResultExpr {
-    SelectResultExpr::AliasedResultExpr(AliasedResultExpr {
-        expr: min(expr),
-        alias: alias.parse().unwrap(),
-    })
-}
+// #[must_use]
+// pub fn min_res(expr: Box<Expr>, alias: &str) -> SelectResultExpr {
+//     SelectResultExpr::AliasedResultExpr(AliasedResultExpr {
+//         expr: min(expr),
+//         alias,
+//     })
+// }
 
 /// Compute the maximum of an expression and give it an alias i.e. SELECT MAX(EXPR) AS ALIAS
 ///
 /// # Panics
 ///
 /// This function will panic if the `alias` cannot be parsed.
-#[must_use]
-pub fn max_res(expr: Box<Expression>, alias: &str) -> SelectResultExpr {
-    SelectResultExpr::AliasedResultExpr(AliasedResultExpr {
-        expr: max(expr),
-        alias: alias.parse().unwrap(),
-    })
-}
+// #[must_use]
+// pub fn max_res(expr: Box<Expr>, alias: &str) -> SelectResultExpr {
+//     SelectResultExpr::AliasedResultExpr(AliasedResultExpr {
+//         expr: max(expr),
+//         alias: alias.into(),
+//     })
+// }
 
 /// Compute the sum of an expression and give it an alias i.e. SELECT SUM(EXPR) AS ALIAS
 ///
 /// # Panics
 ///
 /// This function will panic if the `alias` cannot be parsed.
-#[must_use]
-pub fn sum_res(expr: Box<Expression>, alias: &str) -> SelectResultExpr {
-    SelectResultExpr::AliasedResultExpr(AliasedResultExpr {
-        expr: sum(expr),
-        alias: alias.parse().unwrap(),
-    })
-}
+// #[must_use]
+// pub fn sum_res(expr: Box<Expr>, alias: &str) -> SelectResultExpr {
+//     SelectResultExpr::AliasedResultExpr(AliasedResultExpr {
+//         expr: sum(expr),
+//         alias: alias.into()
+//     })
+// }
 
 /// Count the amount of non-null entries of expression and give it an alias i.e. SELECT COUNT(EXPR) AS ALIAS
 ///
 /// # Panics
 ///
-/// This function will panic if the `alias` cannot be parsed.
-#[must_use]
-pub fn count_res(expr: Box<Expression>, alias: &str) -> SelectResultExpr {
-    SelectResultExpr::AliasedResultExpr(AliasedResultExpr {
-        expr: count(expr),
-        alias: alias.parse().unwrap(),
-    })
-}
+// /// This function will panic if the `alias` cannot be parsed.
+// #[must_use]
+// pub fn count_res(expr: Box<Expr>, alias: &str) -> SelectResultExpr {
+//     SelectResultExpr::AliasedResultExpr(AliasedResultExpr {
+//         expr: count(expr),
+//         alias: alias.into(),
+//     })
+// }
 
 /// Count rows and give the result an alias i.e. SELECT COUNT(*) AS ALIAS
 ///
 /// # Panics
 ///
 /// This function will panic if the `alias` cannot be parsed.
-#[must_use]
-pub fn count_all_res(alias: &str) -> SelectResultExpr {
-    SelectResultExpr::AliasedResultExpr(AliasedResultExpr {
-        expr: Expression::Aggregation {
-            op: AggregationOperator::Count,
-            expr: Box::new(Expression::Wildcard),
-        }
-        .into(),
-        alias: alias.parse().unwrap(),
-    })
-}
+// #[must_use]
+// pub fn count_all_res(alias: &str) -> SelectResultExpr {
+//     SelectResultExpr::AliasedResultExpr(AliasedResultExpr {
+//         expr: Expression::Aggregation {
+//             op: AggregationOperator::Count,
+//             expr: Box::new(Expr::Wildcard),
+//         }
+//         .into(),
+//         alias: alias.into()
+//     })
+// }
 
 /// Generate a `SetExpression` of the kind SELECT COL1, COL2, ... FROM TAB WHERE EXPR GROUP BY ...
 #[must_use]

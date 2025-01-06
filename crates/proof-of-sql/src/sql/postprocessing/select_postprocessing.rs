@@ -34,7 +34,7 @@ impl<S: Scalar> PostprocessingStep<S> for SelectPostprocessing {
             .iter()
             .map(
                 |aliased_result_expr| -> PostprocessingResult<(Ident, OwnedColumn<S>)> {
-                    let result_column = owned_table.evaluate(&aliased_result_expr.expr)?;
+                    let result_column = owned_table.evaluate(&aliased_result_expr.expr).into()?;
                     Ok((aliased_result_expr.alias.into(), result_column))
                 },
             )

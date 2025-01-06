@@ -14,6 +14,9 @@ use proof_of_sql_parser::intermediate_ast::{
     AggregationOperator, AliasedResultExpr, Expression, OrderBy, Slice,
 };
 use sqlparser::ast::Ident;
+use sqlparser::ast::Expr;
+use sqlparser::ast::Expr::Function;
+use sqlparser::ast::FunctionArg;
 
 #[derive(Default, Debug)]
 pub struct QueryContext {
@@ -274,45 +277,45 @@ impl TryFrom<&QueryContext> for Option<GroupByExec> {
             .group_by_exprs
             .iter()
             .zip(res_group_by_columns.iter())
-            .all(|(ident, res)| {
-                if let Expression::Column(res_ident) = *res.expr {
-                    Ident::from(res_ident) == *ident
-                } else {
-                    false
-                }
+            .all(|(ident, res)| match res.expr.as_ref() {
+                Expr::Identifier(res_ident) => *res_ident == *ident,
+                _ => false,
             });
 
         // Check sums
         let sum_expr = sum_expr_columns
             .iter()
             .map(|res| {
-                if let Expression::Aggregation {
-                    op: AggregationOperator::Sum,
-                    ..
-                } = (*res.expr).clone()
-                {
-                    let res_dyn_proof_expr =
-                        DynProofExprBuilder::new(&value.column_mapping).build(&res.expr);
-                    res_dyn_proof_expr
-                        .ok()
-                        .map(|dyn_proof_expr| AliasedDynProofExpr {
-                            alias: res.alias.into(),
-                            expr: dyn_proof_expr,
-                        })
-                } else {
-                    None
+                if let Expr::Function(Function { name, args, .. }) = res.expr.as_ref() {
+                    if name
+                        .0
+                        .iter()
+                        .any(|ident| ident.value.eq_ignore_ascii_case("sum"))
+                    {
+                        let res_dyn_proof_expr =
+                            DynProofExprBuilder::new(&value.column_mapping).build(&res.expr);
+                        res_dyn_proof_expr
+                            .ok()
+                            .map(|dyn_proof_expr| AliasedDynProofExpr {
+                                alias: res.alias.into(),
+                                expr: dyn_proof_expr,
+                            });
+                    }
                 }
+                None
             })
             .collect::<Option<Vec<AliasedDynProofExpr>>>();
 
         // Check count(*)
         let count_column = &value.res_aliased_exprs[num_result_columns - 1];
         let count_column_compliant = matches!(
-            *count_column.expr,
-            Expression::Aggregation {
-                op: AggregationOperator::Count,
+            count_column.expr.as_ref(),
+            Expr::Function(Function {
+                name,
+                args,
                 ..
-            }
+            }) if name.0.iter().any(|ident| ident.value.eq_ignore_ascii_case("count"))
+                && args.iter().any(|arg| matches!(arg, FunctionArg::Wildcard))
         );
 
         if !group_by_compliance || sum_expr.is_none() || !count_column_compliant {

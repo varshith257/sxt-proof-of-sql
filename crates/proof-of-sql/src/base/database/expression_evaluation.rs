@@ -1,16 +1,14 @@
 use super::{ExpressionEvaluationError, ExpressionEvaluationResult};
 use crate::base::{
     database::{OwnedColumn, OwnedTable},
-    math::{
-        decimal::{try_convert_intermediate_decimal_to_scalar, DecimalError, Precision},
-        BigDecimalExt,
-    },
+    math::decimal::{try_convert_intermediate_decimal_to_scalar, DecimalError, Precision},
     scalar::Scalar,
 };
 use alloc::{format, string::ToString, vec};
-use proof_of_sql_parser::posql_time::{PoSQLTimeUnit, PoSQLTimeZone};
+use bigdecimal::BigDecimal;
+use proof_of_sql_parser::posql_time::PoSQLTimeUnit;
 use sqlparser::ast::{
-    BinaryOperator, DataType, ExactNumberInfo, Expr, Ident, TimezoneInfo, UnaryOperator, Value,
+    BinaryOperator, DataType, ExactNumberInfo, Expr, Ident, UnaryOperator, Value,
 };
 
 impl<S: Scalar> OwnedTable<S> {
@@ -60,29 +58,24 @@ impl<S: Scalar> OwnedTable<S> {
             }
             Expr::TypedString { data_type, value } => match data_type {
                 DataType::Decimal(ExactNumberInfo::PrecisionAndScale(precision, scale)) => {
-                    let d = value.parse::<BigDecimalExt>().map_err(|_| {
-                        DecimalError::InvalidDecimal {
-                            error: format!("Invalid decimal value: {value}"),
-                        }
-                    })?;
-                    let raw_scale = d.scale();
-                    let scale = raw_scale
-                        .try_into()
-                        .map_err(|_| DecimalError::InvalidScale {
-                            scale: raw_scale.to_string(),
-                        })?;
-                    let precision = Precision::try_from(d.precision())?;
-                    let scalar = try_convert_intermediate_decimal_to_scalar(&d, precision, scale)?;
-                    Ok(OwnedColumn::Decimal75(precision, scale, vec![scalar; len]))
+                    let decimal = BigDecimal::parse_bytes(value.as_bytes(), 10).unwrap();
+                    let scalar = try_convert_intermediate_decimal_to_scalar(
+                        &decimal,
+                        Precision::try_from(*precision as u64)?,
+                        *scale as i8,
+                    )?;
+                    Ok(OwnedColumn::Decimal75(
+                        Precision::try_from(*precision as u64)?,
+                        *scale as i8,
+                        vec![scalar; len],
+                    ))
                 }
-                DataType::Timestamp(Some(time_unit), Some(time_zone)) => {
+                DataType::Timestamp(Some(time_unit), time_zone) => {
                     let time_unit = PoSQLTimeUnit::try_from(*time_unit).map_err(|err| {
                         DecimalError::InvalidDecimal {
                             error: format!("Invalid time unit precision: {err}"),
                         }
                     })?;
-
-                    let timezone_info = time_zone.clone();
 
                     let timestamp_value =
                         value
@@ -92,33 +85,13 @@ impl<S: Scalar> OwnedTable<S> {
                             })?;
                     Ok(OwnedColumn::TimestampTZ(
                         time_unit,
-                        // Default to UTC
-                        timezone_info,
+                        *time_zone,
                         vec![timestamp_value; len],
                     ))
                 }
-                DataType::Timestamp(Some(time_unit), None) => {
-                    let time_unit = PoSQLTimeUnit::try_from(*time_unit).map_err(|err| {
-                        DecimalError::InvalidDecimal {
-                            error: format!("Invalid time unit precision: {err}"),
-                        }
-                    })?;
-
-                    // Default to UTC if no timezone is provided
-                    let timestamp_value =
-                        value
-                            .parse::<i64>()
-                            .map_err(|_| DecimalError::InvalidDecimal {
-                                error: format!("Invalid timestamp value: {value}"),
-                            })?;
-
-                    Ok(OwnedColumn::TimestampTZ(
-                        time_unit,
-                        // Default to UTC
-                        TimezoneInfo::None,
-                        vec![timestamp_value; len],
-                    ))
-                }
+                _ => Err(ExpressionEvaluationError::Unsupported {
+                    expression: "Unsupported TypedString data type".to_string(),
+                }),
             },
             _ => Err(ExpressionEvaluationError::Unsupported {
                 expression: "Unsupported expression type".to_string(),

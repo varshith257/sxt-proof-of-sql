@@ -1,5 +1,5 @@
 use super::*;
-use proof_of_sql_parser::intermediate_ast::{AliasedResultExpr, OrderBy, OrderByDirection};
+use proof_of_sql_parser::intermediate_ast::{ OrderBy, AliasedResultExpr, OrderByDirection};
 use sqlparser::ast::Ident;
 
 #[must_use]

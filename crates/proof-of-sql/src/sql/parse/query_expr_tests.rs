@@ -3,6 +3,7 @@ use crate::{
     base::{
         database::{ColumnType, TableRef, TestSchemaAccessor},
         map::{indexmap, IndexMap, IndexSet},
+        expr_utils:*;
     },
     sql::{
         parse::QueryExpr,
@@ -15,10 +16,10 @@ use itertools::Itertools;
 use proof_of_sql_parser::{
     intermediate_ast::OrderByDirection::*,
     sql::SelectStatementParser,
-    utility::{
-        add as padd, aliased_expr, col, count, count_all, lit, max, min, mul as pmul, sub as psub,
-        sum,
-    },
+    // utility::{
+    //     add as padd, aliased_expr, col, count, count_all, lit, max, min, mul as pmul, sub as psub,
+    //     sum,
+    // },
 };
 use sqlparser::ast::Ident;
 

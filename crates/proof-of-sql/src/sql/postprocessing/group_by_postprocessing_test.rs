@@ -1,15 +1,15 @@
 use crate::{
     base::{
-        database::{owned_table_utility::*, OwnedTable},
+        database::{expr_utils::*, owned_table_utility::*, OwnedTable},
         scalar::Curve25519Scalar,
     },
     sql::postprocessing::{
-        apply_postprocessing_steps, group_by_postprocessing::*, test_utility::*,
-        OwnedTablePostprocessing, PostprocessingError,
+        apply_postprocessing_steps, group_by_postprocessing::*, OwnedTablePostprocessing,
+        PostprocessingError,
     },
 };
 use bigdecimal::BigDecimal;
-use proof_of_sql_parser::{intermediate_ast::AggregationOperator, utility::*};
+use proof_of_sql_parser::intermediate_ast::AggregationOperator;
 #[test]
 fn we_cannot_have_invalid_group_bys() {
     // Column in result but not in group by or aggregation

@@ -1,4 +1,5 @@
 use super::PoSQLTimestampError;
+use crate::alloc::string::ToString;
 use core::fmt;
 use serde::{Deserialize, Serialize};
 
@@ -23,6 +24,22 @@ impl From<PoSQLTimeUnit> for u64 {
             PoSQLTimeUnit::Millisecond => 3,
             PoSQLTimeUnit::Microsecond => 6,
             PoSQLTimeUnit::Nanosecond => 9,
+        }
+    }
+}
+
+impl TryFrom<u64> for PoSQLTimeUnit {
+    type Error = PoSQLTimestampError;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(PoSQLTimeUnit::Second),
+            3 => Ok(PoSQLTimeUnit::Millisecond),
+            6 => Ok(PoSQLTimeUnit::Microsecond),
+            9 => Ok(PoSQLTimeUnit::Nanosecond),
+            _ => Err(PoSQLTimestampError::UnsupportedPrecision {
+                error: value.to_string(),
+            }),
         }
     }
 }

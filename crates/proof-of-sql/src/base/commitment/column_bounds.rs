@@ -563,7 +563,7 @@ mod tests {
         assert_eq!(decimal75_column_bounds, ColumnBounds::NoOrder);
 
         let timestamp_column = OwnedColumn::<TestScalar>::TimestampTZ(
-            PoSQLTimeUnit::Second,
+            PoSQLTimeUnit::Nanosecond,
             TimezoneInfo::None,
             vec![1_i64, 2, 3, 4],
         );

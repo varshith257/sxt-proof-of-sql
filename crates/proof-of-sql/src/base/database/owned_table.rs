@@ -228,7 +228,7 @@ mod tests {
             ),
             borrowed_timestamptz(
                 "time_stamp",
-                PoSQLTimeUnit::Second,
+                PoSQLTimeUnit::Nanosecond,
                 TimezoneInfo::None,
                 [0_i64, 1, 2, 3, 4, 5, 6, i64::MIN, i64::MAX],
                 &alloc,
@@ -246,7 +246,7 @@ mod tests {
             ),
             timestamptz(
                 "time_stamp",
-                PoSQLTimeUnit::Second,
+                PoSQLTimeUnit::Nanosecond,
                 TimezoneInfo::None,
                 [0_i64, 1, 2, 3, 4, 5, 6, i64::MIN, i64::MAX],
             ),

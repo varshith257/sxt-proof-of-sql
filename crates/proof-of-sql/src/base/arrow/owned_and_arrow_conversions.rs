@@ -23,8 +23,7 @@ use alloc::sync::Arc;
 use arrow::{
     array::{
         ArrayRef, BooleanArray, Decimal128Array, Decimal256Array, Int16Array, Int32Array,
-        Int64Array, Int8Array, StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
-        TimestampNanosecondArray, TimestampSecondArray,
+        Int64Array, Int8Array, StringArray, TimestampNanosecondArray,
     },
     datatypes::{i256, DataType, Schema, SchemaRef, TimeUnit as ArrowTimeUnit},
     error::ArrowError,
@@ -104,12 +103,7 @@ impl<S: Scalar> From<OwnedColumn<S>> for ArrayRef {
             }
             OwnedColumn::Scalar(_) => unimplemented!("Cannot convert Scalar type to arrow type"),
             OwnedColumn::VarChar(col) => Arc::new(StringArray::from(col)),
-            OwnedColumn::TimestampTZ(time_unit, _, col) => match time_unit {
-                PoSQLTimeUnit::Second => Arc::new(TimestampSecondArray::from(col)),
-                PoSQLTimeUnit::Millisecond => Arc::new(TimestampMillisecondArray::from(col)),
-                PoSQLTimeUnit::Microsecond => Arc::new(TimestampMicrosecondArray::from(col)),
-                PoSQLTimeUnit::Nanosecond => Arc::new(TimestampNanosecondArray::from(col)),
-            },
+            OwnedColumn::TimestampTZ(_, _, col) => Arc::new(TimestampNanosecondArray::from(col)),
         }
     }
 }
@@ -228,48 +222,6 @@ impl<S: Scalar> TryFrom<&ArrayRef> for OwnedColumn<S> {
                     .collect(),
             )),
             DataType::Timestamp(time_unit, timezone) => match time_unit {
-                ArrowTimeUnit::Second => {
-                    let array = value
-                        .as_any()
-                        .downcast_ref::<TimestampSecondArray>()
-                        .expect(
-                            "This cannot fail, all Arrow TimeUnits are mapped to PoSQL TimeUnits",
-                        );
-                    let timestamps = array.values().iter().copied().collect::<Vec<i64>>();
-                    Ok(OwnedColumn::TimestampTZ(
-                        PoSQLTimeUnit::Second,
-                        PoSQLTimeZone::try_from(timezone)?.into(),
-                        timestamps,
-                    ))
-                }
-                ArrowTimeUnit::Millisecond => {
-                    let array = value
-                        .as_any()
-                        .downcast_ref::<TimestampMillisecondArray>()
-                        .expect(
-                            "This cannot fail, all Arrow TimeUnits are mapped to PoSQL TimeUnits",
-                        );
-                    let timestamps = array.values().iter().copied().collect::<Vec<i64>>();
-                    Ok(OwnedColumn::TimestampTZ(
-                        PoSQLTimeUnit::Millisecond,
-                        PoSQLTimeZone::try_from(timezone)?.into(),
-                        timestamps,
-                    ))
-                }
-                ArrowTimeUnit::Microsecond => {
-                    let array = value
-                        .as_any()
-                        .downcast_ref::<TimestampMicrosecondArray>()
-                        .expect(
-                            "This cannot fail, all Arrow TimeUnits are mapped to PoSQL TimeUnits",
-                        );
-                    let timestamps = array.values().iter().copied().collect::<Vec<i64>>();
-                    Ok(OwnedColumn::TimestampTZ(
-                        PoSQLTimeUnit::Microsecond,
-                        PoSQLTimeZone::try_from(timezone)?.into(),
-                        timestamps,
-                    ))
-                }
                 ArrowTimeUnit::Nanosecond => {
                     let array = value
                         .as_any()
@@ -284,6 +236,9 @@ impl<S: Scalar> TryFrom<&ArrayRef> for OwnedColumn<S> {
                         timestamps,
                     ))
                 }
+                _ => Err(OwnedArrowConversionError::UnsupportedType {
+                    datatype: DataType::Timestamp(time_unit.clone(), timezone.clone()),
+                }),
             },
             &data_type => Err(OwnedArrowConversionError::UnsupportedType {
                 datatype: data_type.clone(),

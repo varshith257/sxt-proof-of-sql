@@ -28,7 +28,7 @@ use sqlparser::ast::TimezoneInfo;
 fn we_can_compare_columns_with_small_timestamp_values_gte() {
     let data: OwnedTable<Curve25519Scalar> = owned_table([timestamptz(
         "a",
-        PoSQLTimeUnit::Second,
+        PoSQLTimeUnit::Nanosecond,
         TimezoneInfo::WithTimeZone,
         vec![-1, 0, 1],
     )]);
@@ -51,7 +51,7 @@ fn we_can_compare_columns_with_small_timestamp_values_gte() {
     let res = verifiable_res.verify(&ast, &accessor, &()).unwrap().table;
     let expected_res = owned_table([timestamptz(
         "a",
-        PoSQLTimeUnit::Second,
+        PoSQLTimeUnit::Nanosecond,
         TimezoneInfo::WithTimeZone,
         vec![1],
     )]);
@@ -62,7 +62,7 @@ fn we_can_compare_columns_with_small_timestamp_values_gte() {
 fn we_can_compare_columns_with_small_timestamp_values_lte() {
     let data: OwnedTable<Curve25519Scalar> = owned_table([timestamptz(
         "a",
-        PoSQLTimeUnit::Second,
+        PoSQLTimeUnit::Nanosecond,
         TimezoneInfo::WithTimeZone,
         vec![-1, 0, 1],
     )]);
@@ -85,7 +85,7 @@ fn we_can_compare_columns_with_small_timestamp_values_lte() {
     let res = verifiable_res.verify(&ast, &accessor, &()).unwrap().table;
     let expected_res = owned_table([timestamptz(
         "a",
-        PoSQLTimeUnit::Second,
+        PoSQLTimeUnit::Nanosecond,
         TimezoneInfo::WithTimeZone,
         vec![-1, 0],
     )]);

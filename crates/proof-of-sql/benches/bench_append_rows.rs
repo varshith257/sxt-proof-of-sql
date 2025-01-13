@@ -121,7 +121,7 @@ pub fn generate_random_owned_table<S: Scalar>(
             "int" => columns.push(int(&*identifier, vec![rng.gen::<i32>(); num_rows])),
             "timestamptz" => columns.push(timestamptz(
                 &*identifier,
-                PoSQLTimeUnit::Second,
+                PoSQLTimeUnit::Nanosecond,
                 TimezoneInfo::None,
                 vec![rng.gen::<i64>(); num_rows],
             )),

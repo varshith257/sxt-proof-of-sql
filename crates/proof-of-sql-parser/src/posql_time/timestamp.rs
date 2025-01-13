@@ -80,16 +80,8 @@ impl PoSQLTimestamp {
 
         let offset_seconds = dt.offset().local_minus_utc();
         let timezone = PoSQLTimeZone::new(offset_seconds);
-        let nanoseconds = dt.timestamp_subsec_nanos();
-        let timeunit = if nanoseconds % 1_000 != 0 {
-            PoSQLTimeUnit::Nanosecond
-        } else if nanoseconds % 1_000_000 != 0 {
-            PoSQLTimeUnit::Microsecond
-        } else if nanoseconds % 1_000_000_000 != 0 {
-            PoSQLTimeUnit::Millisecond
-        } else {
-            PoSQLTimeUnit::Second
-        };
+        let _ = dt.timestamp_subsec_nanos();
+        let timeunit = PoSQLTimeUnit::Nanosecond;
 
         Ok(PoSQLTimestamp {
             timestamp: dt.with_timezone(&Utc),
@@ -130,7 +122,7 @@ impl PoSQLTimestamp {
         match Utc.timestamp_opt(epoch, 0) {
             LocalResult::Single(timestamp) => Ok(PoSQLTimestamp {
                 timestamp,
-                timeunit: PoSQLTimeUnit::Second,
+                timeunit: PoSQLTimeUnit::Nanosecond,
                 timezone: PoSQLTimeZone::utc(),
             }),
             LocalResult::Ambiguous(earliest, latest) => Err(PoSQLTimestampError::Ambiguous{ error:
@@ -156,9 +148,10 @@ mod tests {
     #[test]
     fn test_unix_epoch_timestamp_parsing() {
         let unix_time = 1_231_006_505; // Example Unix timestamp (seconds since epoch)
-        let expected_datetime = Utc.timestamp_opt(unix_time, 0).unwrap();
-        let expected_unit = PoSQLTimeUnit::Second; // Assuming basic second precision for Unix timestamp
-        let input = unix_time; // Simulate input as string since Unix times are often transmitted as strings
+        let unix_time_in_nanoseconds = unix_time * 1_000_000_000;
+        let expected_datetime = Utc.timestamp_opt(unix_time_in_nanoseconds, 0).unwrap();
+        let expected_unit = PoSQLTimeUnit::Nanosecond;
+        let input = unix_time_in_nanoseconds; // Simulate input as string since Unix times are often transmitted as strings
         let result = PoSQLTimestamp::to_timestamp(input).unwrap();
 
         assert_eq!(result.timestamp, expected_datetime);
@@ -206,16 +199,6 @@ mod tests {
                 error: "input contains invalid characters".into()
             })
         );
-    }
-
-    #[test]
-    fn test_timestamp_with_seconds() {
-        let input = "2023-06-26T12:34:56Z";
-        let expected_time = Utc.with_ymd_and_hms(2023, 6, 26, 12, 34, 56).unwrap();
-        let expected_unit = PoSQLTimeUnit::Second;
-        let result = PoSQLTimestamp::try_from(input).unwrap();
-        assert_eq!(result.timestamp, expected_time);
-        assert_eq!(result.timeunit, expected_unit);
     }
 
     #[test]

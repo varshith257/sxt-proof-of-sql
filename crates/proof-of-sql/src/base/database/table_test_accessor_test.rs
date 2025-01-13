@@ -67,7 +67,7 @@ fn we_can_access_the_columns_of_a_table() {
         borrowed_boolean("boolean", [true, false, true, false], &alloc),
         borrowed_timestamptz(
             "time",
-            PoSQLTimeUnit::Second,
+            PoSQLTimeUnit::Nanosecond,
             TimezoneInfo::None,
             [4, 5, 6, 5],
             &alloc,
@@ -130,7 +130,7 @@ fn we_can_access_the_columns_of_a_table() {
     let column = ColumnRef::new(
         table_ref_2,
         "time".into(),
-        ColumnType::TimestampTZ(PoSQLTimeUnit::Second, TimezoneInfo::None),
+        ColumnType::TimestampTZ(PoSQLTimeUnit::Nanosecond, TimezoneInfo::None),
     );
     match accessor.get_column(column) {
         Column::TimestampTZ(_, _, col) => assert_eq!(col.to_vec(), vec![4, 5, 6, 5]),

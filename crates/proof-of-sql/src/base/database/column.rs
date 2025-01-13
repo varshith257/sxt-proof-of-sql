@@ -419,9 +419,6 @@ impl ColumnType {
             | Self::Scalar => Some(0),
             Self::Boolean | Self::VarChar => None,
             Self::TimestampTZ(tu, _) => match tu {
-                PoSQLTimeUnit::Second => Some(0),
-                PoSQLTimeUnit::Millisecond => Some(3),
-                PoSQLTimeUnit::Microsecond => Some(6),
                 PoSQLTimeUnit::Nanosecond => Some(9),
             },
         }
@@ -565,9 +562,9 @@ mod tests {
 
     #[test]
     fn column_type_serializes_to_string() {
-        let column_type = ColumnType::TimestampTZ(PoSQLTimeUnit::Second, TimezoneInfo::None);
+        let column_type = ColumnType::TimestampTZ(PoSQLTimeUnit::Nanosecond, TimezoneInfo::None);
         let serialized = serde_json::to_string(&column_type).unwrap();
-        assert_eq!(serialized, r#"{"TimestampTZ":["Second","None"]}"#);
+        assert_eq!(serialized, r#"{"TimestampTZ":["Nanosecond","None"]}"#);
 
         let column_type = ColumnType::Boolean;
         let serialized = serde_json::to_string(&column_type).unwrap();
@@ -609,9 +606,9 @@ mod tests {
     #[test]
     fn we_can_deserialize_columns_from_valid_strings() {
         let expected_column_type =
-            ColumnType::TimestampTZ(PoSQLTimeUnit::Second, TimezoneInfo::None);
+            ColumnType::TimestampTZ(PoSQLTimeUnit::Nanosecond, TimezoneInfo::None);
         let deserialized: ColumnType =
-            serde_json::from_str(r#"{"TimestampTZ":["Second","None"]}"#).unwrap();
+            serde_json::from_str(r#"{"TimestampTZ":["Nanosecond","None"]}"#).unwrap();
         assert_eq!(deserialized, expected_column_type);
 
         let expected_column_type = ColumnType::Boolean;
@@ -1064,7 +1061,7 @@ mod tests {
         assert_eq!(column.column_type().bit_size(), 256);
 
         let column: Column<'_, DoryScalar> =
-            Column::TimestampTZ(PoSQLTimeUnit::Second, TimezoneInfo::None, &[1, 2, 3]);
+            Column::TimestampTZ(PoSQLTimeUnit::Nanosecond, TimezoneInfo::None, &[1, 2, 3]);
         assert_eq!(column.column_type().byte_size(), 8);
         assert_eq!(column.column_type().bit_size(), 64);
     }

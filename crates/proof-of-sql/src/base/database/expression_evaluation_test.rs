@@ -40,7 +40,7 @@ fn we_can_evaluate_a_simple_literal() {
     // UNIX timestamp for 2022-03-01T00:00:00Z
     let actual_timestamp = 1_646_092_800;
     let expected_column = OwnedColumn::TimestampTZ(
-        PoSQLTimeUnit::Second,
+        PoSQLTimeUnit::Nanosecond,
         TimezoneInfo::None,
         vec![actual_timestamp; 5],
     );

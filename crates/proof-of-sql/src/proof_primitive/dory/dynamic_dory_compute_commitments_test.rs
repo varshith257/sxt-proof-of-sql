@@ -247,7 +247,7 @@ fn we_can_compute_a_dynamic_dory_commitment_with_mixed_committable_columns() {
             CommittableColumn::Scalar(vec![[14, 0, 0, 0], [15, 0, 0, 0]]),
             CommittableColumn::VarChar(vec![[16, 0, 0, 0]]),
             CommittableColumn::TimestampTZ(
-                PoSQLTimeUnit::Second,
+                PoSQLTimeUnit::Nanosecond,
                 TimezoneInfo::None,
                 &[17, 18, 19, 20],
             ),
@@ -322,7 +322,7 @@ fn we_can_compute_a_dynamic_dory_commitment_with_mixed_committable_columns_with_
             CommittableColumn::Scalar(vec![[14, 0, 0, 0], [15, 0, 0, 0]]),
             CommittableColumn::VarChar(vec![[16, 0, 0, 0]]),
             CommittableColumn::TimestampTZ(
-                PoSQLTimeUnit::Second,
+                PoSQLTimeUnit::Nanosecond,
                 TimezoneInfo::None,
                 &[17, 18, 19, 20],
             ),
@@ -397,7 +397,7 @@ fn we_can_compute_a_dynamic_dory_commitment_with_mixed_committable_columns_with_
             CommittableColumn::Scalar(vec![[14, 0, 0, 0], [15, 0, 0, 0]]),
             CommittableColumn::VarChar(vec![[16, 0, 0, 0]]),
             CommittableColumn::TimestampTZ(
-                PoSQLTimeUnit::Second,
+                PoSQLTimeUnit::Nanosecond,
                 TimezoneInfo::None,
                 &[-18, -17, 17, 18],
             ),
@@ -485,7 +485,7 @@ fn we_can_compute_a_dynamic_dory_commitment_with_mixed_committable_columns_with_
             CommittableColumn::Scalar(vec![[14, 0, 0, 0], [15, 0, 0, 0]]),
             CommittableColumn::VarChar(vec![[16, 0, 0, 0]]),
             CommittableColumn::TimestampTZ(
-                PoSQLTimeUnit::Second,
+                PoSQLTimeUnit::Nanosecond,
                 TimezoneInfo::None,
                 &[-18, -17, 17, 18],
             ),

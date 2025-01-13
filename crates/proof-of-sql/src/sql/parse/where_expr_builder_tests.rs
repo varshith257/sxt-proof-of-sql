@@ -57,30 +57,6 @@ fn get_column_mappings_for_testing() -> IndexMap<Ident, ColumnRef> {
         ColumnRef::new(tab_ref, "varchar_column".into(), ColumnType::VarChar),
     );
     column_mapping.insert(
-        "timestamp_second_column".into(),
-        ColumnRef::new(
-            tab_ref,
-            "timestamp_second_column".into(),
-            ColumnType::TimestampTZ(PoSQLTimeUnit::Second, TimezoneInfo::None),
-        ),
-    );
-    column_mapping.insert(
-        "timestamp_millisecond_column".into(),
-        ColumnRef::new(
-            tab_ref,
-            "timestamp_millisecond_column".into(),
-            ColumnType::TimestampTZ(PoSQLTimeUnit::Millisecond, TimezoneInfo::None),
-        ),
-    );
-    column_mapping.insert(
-        "timestamp_microsecond_column".into(),
-        ColumnRef::new(
-            tab_ref,
-            "timestamp_microsecond_column".into(),
-            ColumnType::TimestampTZ(PoSQLTimeUnit::Microsecond, TimezoneInfo::None),
-        ),
-    );
-    column_mapping.insert(
         "timestamp_nanosecond_column".into(),
         ColumnRef::new(
             tab_ref,

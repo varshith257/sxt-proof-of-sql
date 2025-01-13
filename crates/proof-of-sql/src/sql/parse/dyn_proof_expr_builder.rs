@@ -117,9 +117,6 @@ impl DynProofExprBuilder<'_> {
                         }
                         })?
                     }
-                    PoSQLTimeUnit::Microsecond => its.timestamp().timestamp_micros(),
-                    PoSQLTimeUnit::Millisecond => its.timestamp().timestamp_millis(),
-                    PoSQLTimeUnit::Second => its.timestamp().timestamp(),
                 };
                 Ok(DynProofExpr::new_literal(LiteralValue::TimeStampTZ(
                     its.timeunit(),

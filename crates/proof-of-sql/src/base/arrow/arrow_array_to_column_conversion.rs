@@ -208,7 +208,7 @@ impl ArrayRefExt for ArrayRef {
                     ArrowTimeUnit::Second => {
                         if let Some(array) = self.as_any().downcast_ref::<TimestampSecondArray>() {
                             Ok(Column::TimestampTZ(
-                                PoSQLTimeUnit::Second,
+                                PoSQLTimeUnit::Nanosecond,
                                 timezone.into(),
                                 &array.values()[range.start..range.end],
                             ))
@@ -223,7 +223,7 @@ impl ArrayRefExt for ArrayRef {
                             self.as_any().downcast_ref::<TimestampMillisecondArray>()
                         {
                             Ok(Column::TimestampTZ(
-                                PoSQLTimeUnit::Millisecond,
+                                PoSQLTimeUnit::Nanosecond,
                                 timezone.into(),
                                 &array.values()[range.start..range.end],
                             ))
@@ -238,7 +238,7 @@ impl ArrayRefExt for ArrayRef {
                             self.as_any().downcast_ref::<TimestampMicrosecondArray>()
                         {
                             Ok(Column::TimestampTZ(
-                                PoSQLTimeUnit::Microsecond,
+                                PoSQLTimeUnit::Nanosecond,
                                 timezone.into(),
                                 &array.values()[range.start..range.end],
                             ))
@@ -315,7 +315,7 @@ mod tests {
         let result = array.to_column::<TestScalar>(&alloc, &(1..3), None);
         assert_eq!(
             result.unwrap(),
-            Column::TimestampTZ(PoSQLTimeUnit::Second, TimezoneInfo::None, &data[1..3])
+            Column::TimestampTZ(PoSQLTimeUnit::Nanosecond, TimezoneInfo::None, &data[1..3])
         );
     }
 
@@ -333,7 +333,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             result,
-            Column::TimestampTZ(PoSQLTimeUnit::Second, TimezoneInfo::None, &[])
+            Column::TimestampTZ(PoSQLTimeUnit::Nanosecond, TimezoneInfo::None, &[])
         );
     }
 
@@ -349,7 +349,7 @@ mod tests {
         let result = array.to_column::<DoryScalar>(&alloc, &(1..1), None);
         assert_eq!(
             result.unwrap(),
-            Column::TimestampTZ(PoSQLTimeUnit::Second, TimezoneInfo::None, &[])
+            Column::TimestampTZ(PoSQLTimeUnit::Nanosecond, TimezoneInfo::None, &[])
         );
     }
 
@@ -1016,7 +1016,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             result,
-            Column::TimestampTZ(PoSQLTimeUnit::Second, TimezoneInfo::None, &data[..])
+            Column::TimestampTZ(PoSQLTimeUnit::Nanosecond, TimezoneInfo::None, &data[..])
         );
     }
 
@@ -1086,7 +1086,7 @@ mod tests {
             array
                 .to_column::<TestScalar>(&alloc, &(1..3), None)
                 .unwrap(),
-            Column::TimestampTZ(PoSQLTimeUnit::Second, TimezoneInfo::None, &data[1..3])
+            Column::TimestampTZ(PoSQLTimeUnit::Nanosecond, TimezoneInfo::None, &data[1..3])
         );
     }
 
@@ -1144,7 +1144,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             result,
-            Column::TimestampTZ(PoSQLTimeUnit::Second, TimezoneInfo::None, &[])
+            Column::TimestampTZ(PoSQLTimeUnit::Nanosecond, TimezoneInfo::None, &[])
         );
     }
 }

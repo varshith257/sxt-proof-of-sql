@@ -44,7 +44,7 @@ fn we_can_create_an_owned_table_with_data() {
         ),
         timestamptz(
             "time_stamp",
-            PoSQLTimeUnit::Second,
+            PoSQLTimeUnit::Nanosecond,
             TimezoneInfo::None,
             [0, 1, 2, 3, 4, 5, 6, i64::MIN, i64::MAX],
         ),
@@ -53,7 +53,7 @@ fn we_can_create_an_owned_table_with_data() {
     table.insert(
         Ident::new("time_stamp"),
         OwnedColumn::TimestampTZ(
-            PoSQLTimeUnit::Second,
+            PoSQLTimeUnit::Nanosecond,
             TimezoneInfo::None,
             [0, 1, 2, 3, 4, 5, 6, i64::MIN, i64::MAX].into(),
         ),
@@ -111,7 +111,7 @@ fn we_get_inequality_between_tables_with_differing_column_order() {
         boolean("d", [false; 0]),
         timestamptz(
             "time_stamp",
-            PoSQLTimeUnit::Second,
+            PoSQLTimeUnit::Nanosecond,
             TimezoneInfo::None,
             [0; 0],
         ),
@@ -123,7 +123,7 @@ fn we_get_inequality_between_tables_with_differing_column_order() {
         varchar("c", ["0"; 0]),
         timestamptz(
             "time_stamp",
-            PoSQLTimeUnit::Second,
+            PoSQLTimeUnit::Nanosecond,
             TimezoneInfo::None,
             [0; 0],
         ),
@@ -139,7 +139,7 @@ fn we_get_inequality_between_tables_with_differing_data() {
         boolean("d", [true]),
         timestamptz(
             "time_stamp",
-            PoSQLTimeUnit::Second,
+            PoSQLTimeUnit::Nanosecond,
             TimezoneInfo::None,
             [1_625_072_400],
         ),
@@ -151,7 +151,7 @@ fn we_get_inequality_between_tables_with_differing_data() {
         boolean("d", [true]),
         timestamptz(
             "time_stamp",
-            PoSQLTimeUnit::Second,
+            PoSQLTimeUnit::Nanosecond,
             TimezoneInfo::None,
             [1_625_076_000],
         ),

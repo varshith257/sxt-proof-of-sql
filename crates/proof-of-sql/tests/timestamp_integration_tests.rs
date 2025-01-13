@@ -34,7 +34,7 @@ fn we_can_prove_a_basic_query_containing_rfc3339_timestamp_with_dory() {
             int128("int128", [i128::MIN, 0, i128::MAX]),
             timestamptz(
                 "times",
-                PoSQLTimeUnit::Second,
+                PoSQLTimeUnit::Nanosecond,
                 TimezoneInfo::None,
                 [i64::MIN, 0, i64::MAX],
             ),
@@ -60,7 +60,7 @@ fn we_can_prove_a_basic_query_containing_rfc3339_timestamp_with_dory() {
         .table;
     let expected_result = owned_table([timestamptz(
         "times",
-        PoSQLTimeUnit::Second,
+        PoSQLTimeUnit::Nanosecond,
         TimezoneInfo::None,
         [0],
     )]);
@@ -81,7 +81,7 @@ fn run_timestamp_query_test(
         "sxt.table".parse().unwrap(),
         owned_table([timestamptz(
             "times",
-            PoSQLTimeUnit::Second,
+            PoSQLTimeUnit::Nanosecond,
             TimezoneInfo::None,
             test_timestamps,
         )]),
@@ -100,7 +100,7 @@ fn run_timestamp_query_test(
         .table;
     let expected_result = owned_table([timestamptz(
         "times",
-        PoSQLTimeUnit::Second,
+        PoSQLTimeUnit::Nanosecond,
         TimezoneInfo::None,
         expected_timestamps,
     )]);
